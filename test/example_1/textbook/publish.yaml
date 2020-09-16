@@ -1,0 +1,5 @@
+name: Textbook
+author: Justin Eldridge
+artifacts:
+    textbook:
+        file: ./book.pdf

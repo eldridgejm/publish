@@ -1,0 +1,23 @@
+required_artifacts:
+    - homework
+    - solution
+
+optional_artifacts:
+    - template
+
+metadata_schema: |
+    name: str()
+    due: timestamp()
+    released: day()
+    artifacts: include('artifacts')
+
+    ---
+
+    artifacts:
+        homework: include('artifact')
+        solution: include('artifact')
+        template: include('artifact', required=False)
+
+    artifact:
+        file: str()
+        released: timestamp()

@@ -1,0 +1,4 @@
+schema: |
+    name: str()
+    week: int()
+    is_good: bool()
