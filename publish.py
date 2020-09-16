@@ -22,212 +22,126 @@ of an artifact is the pdf of the homework's solutions.
 
 """
 
-from collections import deque
-import pathlib
-import textwrap
 import typing
+import pathlib
 import yaml
+from textwrap import dedent
 
-import yamale
-
-
-COLLECTION_FILE = "collection.yaml"
-PUBLICATION_FILE = "publish.yaml"
+import cerberus
 
 
 class Error(Exception):
-    """A generic error."""
+    """Generic error."""
 
 
-class SchemaError(Exception):
-    """A malformed configuration file."""
+class SchemaError(Error):
+    """Invalid configuration file."""
+
 
 class Artifact(typing.NamedTuple):
-    key: str
-    workdir: pathlib.Path
-    publication: "Publication"
     file: str
-    recipe: str = None
-    released: str = None
+    recipe: str
+    workdir: pathlib.Path
 
 
 class Publication(typing.NamedTuple):
-    key: str
-    path: pathlib.Path
-    collection: "Collection"
     metadata: typing.Mapping[str, typing.Any]
     artifacts: typing.Mapping[str, Artifact]
 
 
 class Collection(typing.NamedTuple):
-    key: str
-    universe: "Universe"
-    schema: str
-    path: pathlib.Path
+    metadata_schema: str
+    required_artifacts: typing.List[str]
+    optional_artifacts: typing.List[str]
+    allow_unspecified_artifacts: bool
     publications: typing.Mapping[str, Publication]
 
 
-class Universe(typing.NamedTuple):
-    root: pathlib.Path
-    collections: typing.Mapping[str, Collection]
-    singletons: typing.Mapping[str, Publication]
-
-
-def _load_collection_file(path, universe):
-    """Read a Collection from a collection.yaml
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        Path to the directory containing the collection.yaml file
-    universe : Universe
-        The universe that the collection will be added to.
-
-    Returns
-    -------
-    The collection without publications.
-
-    """
-    key = str(path.relative_to(universe.root))
-
-    with (path / COLLECTION_FILE).open() as fileobj:
+def read_collection_file(path):
+    with path.open() as fileobj:
         contents = yaml.load(fileobj, Loader=yaml.Loader)
 
-    # validate collection file
-    schema = yamale.make_schema(content="schema: str()")
-    data = yamale.make_data(path / COLLECTION_FILE)
+    # define the structure of the collections file. we require only the
+    # 'required_artifacts' field.
+    validator = cerberus.Validator(
+        {
+            "required_artifacts": {
+                "type": "list",
+                "schema": {"type": "string"},
+                "required": True,
+            },
+            "optional_artifacts": {
+                "type": "list",
+                "schema": {"type": "string"},
+                "default": [],
+            },
+            "metadata_schema": {"type": "dict", "default": {}},
+            "allow_unspecified_artifacts": {"type": "boolean", "default": False},
+        }
+    )
+
+    validated_contents = validator.validated(contents)
+
+    if validated_contents is None:
+        raise SchemaError(f"Error loading {path}. {validator.errors}")
+
+    # make sure that the metadata schema is valid
     try:
-        yamale.validate(schema, data)
-    except yamale.YamaleError as exc:
-        raise SchemaError(f'{path} has invalid collection.yaml: {exc}')
+        cerberus.Validator(validated_contents["metadata_schema"])
+    except Exception:
+        raise SchemaError(f"Error loading {path}. Invalid metadata schema.")
 
-    collection = Collection(
-        key, universe=universe, schema=contents["schema"], path=path, publications={},
+    return Collection(publications={}, **validated_contents)
+
+
+def _validate_artifact(workdir, definition):
+    # validate and extract the artifacts
+    artifact_validator = cerberus.Validator(
+        {"file": {"type": "string"}, "recipe": {"type": "string", "default": None}}
     )
-    universe.collections[key] = collection
 
-    return collection
+    artifact = artifact_validator.validated(definition)
+    if artifact is None:
+        raise SchemaError(f"{validator.errors}")
+
+    return Artifact(workdir=workdir, **artifact)
 
 
-def _load_artifact(key, definition, publication):
-    artifact = Artifact(
-        key=key,
-        workdir=publication.path,
-        publication=publication,
-        **definition
+def read_publication_file(path, collection):
+    with path.open() as fileobj:
+        contents = yaml.load(fileobj, Loader=yaml.Loader)
+
+    if "artifacts" not in contents:
+        raise SchemeError(f"{path} has no artifacts section.")
+
+    # make sure that all necessary artifacts are specified
+    provided_artifacts = set(contents["artifacts"])
+    missing = set(collection.required_artifacts) - set(provided_artifacts)
+    extra = set(provided_artifacts) - (
+        set(collection.required_artifacts) | set(collection.optional_artifacts)
     )
-    publication.artifacts[key] = artifact
-    return artifact
 
+    if missing:
+        raise SchemaError(f"Missing artifacts {missing} in {path}.")
 
-def _validate_publication_file(path, collection):
+    if extra and not collection.allow_unspecified_artifacts:
+        raise SchemaError(f"Extra artifacts {extra} in {path}.")
 
-    class Artifacts(yamale.validators.Validator):
-        tag = "artifacts"
-
-        schema = textwrap.dedent(
-            """
-            
-            """
-            )
-
-        def _is_valid(self, value):
-            1/0
-            return True
-
-    validators = yamale.validators.DefaultValidators.copy()
-    validators[Artifacts.tag] = Artifacts
-
-    if collection is not None:
-        schema = yamale.make_schema(content=collection.schema, validators=validators)
-        contents = yamale.make_data(path / PUBLICATION_FILE)
-
+    artifacts = {}
+    for key, definition in contents['artifacts'].items():
         try:
-            yamale.validate(schema, contents)
-        except yamale.YamaleError:
-            raise SchemaError(f'{path} does not match collection schema.')
-    else:
-        with (path / PUBLICATION_FILE).open() as fileobj:
-            contents = yaml.load(fileobj, Loader=yaml.Loader)
+            artifacts[key] = _validate_artifact(path.parent, definition)
+        except SchemaError as exc:
+            raise SchemaError(f'Invalid {path}: {exc}')
 
-        if 'artifacts' not in contents:
-            raise SchemaError(f'{path} contains no artifacts.')
-
-    return contents
-
-
-def _load_publication_file(path, collection, universe):
-    """Read a Publication from a publish.yaml.
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        Path to the directory containing the publish.yaml file.
-    collection : Collection
-        The collection to add the publication to -- if any.
-    universe : Universe
-        The universe to add the publication to if it isn't in a collection.
-
-    Returns
-    -------
-    Publication
-        The publication with artifacts included.
-
-    """
-
-    if collection is not None:
-        key = str(path.relative_to(collection.path))
-    else:
-        key = path.name
-
-    contents = _validate_publication_file(path, collection)
-
-    # metadata is everything that isn't an artifact
+    # everything besides the artifacts makes up the metadata
     metadata = contents.copy()
-    try:
-        del metadata["artifacts"]
-    except KeyError:
-        raise SchemaError(f'{path} contains no artifacts.')
+    del metadata["artifacts"]
 
-    publication = Publication(
-        key=key, path=path, collection=collection, metadata=metadata, artifacts={}
-    )
+    metadata_validator = cerberus.Validator(collection.metadata_schema)
+    metadata = metadata_validator.validated(metadata)
 
-    for artifact_key, artifact_definition in contents['artifacts'].items():
-        _load_artifact(artifact_key, artifact_definition, publication)
+    if metadata is None:
+        raise SchemaError(f'Invalid metadata in {path}: {metadata.errors}')
 
-    if collection is not None:
-        collection.publications[key] = publication
-    else:
-        universe.singletons[key] = publication
-
-    return publication
-
-
-def discover(root: pathlib.Path):
-    """Recursively find all publications in a directory."""
-
-    universe = Universe(root=pathlib.Path(root), collections={}, singletons={})
-
-    # we'll perform a BFS. Each node will be a (directory_path, collection)
-    # pair we'll start with collection=None, signaling that we're under no
-    # collection
-    queue = deque([(root, None)])
-
-    while queue:
-        path, collection = queue.popleft()
-
-        # check if we're entering a collection; if so, load it
-        if (path / COLLECTION_FILE).exists():
-            collection = _load_collection_file(path, universe)
-
-        # check if this is a publication; if so, load it
-        if (path / PUBLICATION_FILE).exists():
-            _load_publication_file(path, collection, universe)
-
-        # add all subdirectories to the queue
-        for subpath in path.iterdir():
-            if subpath.is_dir():
-                queue.append([subpath, collection])
-
-    return universe
+    return Publication(metadata=metadata, artifacts=artifacts)

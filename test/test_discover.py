@@ -72,15 +72,13 @@ def test_discover_loads_dates_as_dates():
 
     # then
     assert isinstance(
-        universe.collections["homeworks"]
-        .publications["01-intro"]
-        .metadata['due'], datetime.datetime
+        universe.collections["homeworks"].publications["01-intro"].metadata["due"],
+        datetime.datetime,
     )
 
     assert isinstance(
-        universe.collections["homeworks"]
-        .publications["01-intro"]
-        .metadata['released'], datetime.date
+        universe.collections["homeworks"].publications["01-intro"].metadata["released"],
+        datetime.date,
     )
 
 

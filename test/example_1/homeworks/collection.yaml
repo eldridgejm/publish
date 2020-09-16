@@ -10,14 +10,3 @@ metadata_schema: |
     due: timestamp()
     released: day()
     artifacts: include('artifacts')
-
-    ---
-
-    artifacts:
-        homework: include('artifact')
-        solution: include('artifact')
-        template: include('artifact', required=False)
-
-    artifact:
-        file: str()
-        released: timestamp()
