@@ -130,5 +130,7 @@ def test_build_collection(example_1):
 
     # then
     assert (example_1 / "homeworks" / "01-intro" / "solution.pdf").exists()
-    build_result = collections['homeworks'].publications['01-intro'].artifacts['solution']
+    build_result = (
+        collections["homeworks"].publications["01-intro"].artifacts["solution"]
+    )
     assert build_result.is_released
