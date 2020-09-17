@@ -5,8 +5,8 @@ metadata:
 
 artifacts:
     homework:
-        file: ./build/homework.pdf
-        recipe: make homework
+        file: homework.pdf
+        recipe: touch homework.pdf
     solution:
-        file: ./build/solution.pdf
-        recipe: make solution
+        file: solution.pdf
+        recipe: touch solution.pdf

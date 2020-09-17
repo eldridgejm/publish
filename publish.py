@@ -27,6 +27,7 @@ from textwrap import dedent
 import datetime
 import pathlib
 import re
+import subprocess
 import typing
 import yaml
 
@@ -49,6 +50,10 @@ class PublicationError(Error):
     """Publication does not fit within collection."""
 
 
+class BuildError(Error):
+    """Problem while building the artifact."""
+
+
 class Artifact(typing.NamedTuple):
     """An artifact."""
 
@@ -63,6 +68,22 @@ class Artifact(typing.NamedTuple):
 
     # time the artifact should be made public. if None, it is always available
     release_time: datetime.datetime = None
+
+
+class ArtifactBuildResult(typing.NamedTuple):
+    """An artifact's build results."""
+
+    # the working directory used to build the artifact
+    workdir: pathlib.Path
+
+    # the path to the file that is the result of the build, relative to the workdir
+    file: str
+
+    # whether or not the artifact is released
+    is_released: bool
+
+    # the stdout of the build. if None, the build didn't happen
+    proc: subprocess.CompletedProcess
 
 
 class Publication(typing.NamedTuple):
@@ -251,20 +272,23 @@ def _parse_release_time(s, metadata):
     if not isinstance(s, str):
         return s
 
-    # check to make sure it has the right format
-    match = re.match(r"(\d) day[s]{0,1} (after|before) metadata\.(\w+)$", s)
+    short_match = re.match(r"metadata\.(\w+)$", s)
+    long_match = re.match(r"(\d) day[s]{0,1} (after|before) metadata\.(\w+)$", s)
 
-    if not match:
+    if short_match:
+        [variable] = short_match.groups()
+        factor = 1
+        days = 0
+    elif long_match:
+        days, before_or_after, variable = long_match.groups()
+        factor = -1 if before_or_after == "before" else 1
+    else:
         raise SchemaError("Invalid relative date string.")
-
-    days, before_or_after, variable = match.groups()
 
     if variable not in metadata or not isinstance(
         metadata[variable], datetime.datetime
     ):
-        raise SchemaError(f"Invalid date variable {variable}.")
-
-    factor = -1 if before_or_after == "before" else 1
+        raise SchemaError(f"Invalid reference variable '{variable}'. Not a datetime.")
 
     delta = datetime.timedelta(days=factor * int(days))
     return metadata[variable] + delta
@@ -436,3 +460,111 @@ def discover(root: pathlib.Path, default_collection=None, ignore=None):
                 queue.append(node)
 
     return collections
+
+
+def build_artifact(
+    artifact,
+    ignore_release_time=False,
+    now=datetime.datetime.now,
+    run=subprocess.run,
+    exists=pathlib.Path.exists,
+):
+    """Build an artifact using its recipe.
+
+    Parameters
+    ----------
+    artifact : Artifact
+        The artifact to build.
+    ignore_release_time : bool
+        If True, the release time of the artifact will be ignored, and it will
+        be built anyways. Default: False.
+
+    Returns
+    -------
+    ArtifactBuildResult
+        A summary of the build results.
+
+    """
+    build_result = ArtifactBuildResult(
+        workdir=artifact.workdir, file=artifact.file, is_released=False, proc=None
+    )
+
+    if (
+        not ignore_release_time
+        and artifact.release_time is not None
+        and artifact.release_time > now()
+    ):
+        return build_result
+
+    if artifact.recipe is None:
+        proc = None
+    else:
+        proc = run(
+            artifact.recipe,
+            shell=True,
+            cwd=artifact.workdir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        if proc.returncode:
+            raise BuildError(
+                f"There was a problem while building the artifact: \n{proc.stderr.decode()}"
+            )
+
+    filepath = artifact.workdir / artifact.file
+    if not exists(filepath):
+        raise BuildError(f"Artifact file {filepath} does not exist.")
+
+    return build_result._replace(is_released=True, proc=proc)
+
+
+def _all_artifacts(collections):
+    Location = namedtuple(
+        "Location",
+        [
+            "collection_key",
+            "collection",
+            "publication_key",
+            "publication",
+            "artifact_key",
+            "artifact",
+        ],
+    )
+    for collection_key, collection in collections.items():
+        for publication_key, publication in collection.publications.items():
+            for artifact_key, artifact in publication.artifacts.items():
+                yield Location(
+                    collection_key,
+                    collection,
+                    publication_key,
+                    publication,
+                    artifact_key,
+                    artifact,
+                )
+
+
+def build(collections):
+    """Convenience function to build all of the artifacts in the collections."""
+    for collection_key, collection in collections.items():
+        for publication_key, publication in collection.publications.items():
+            for artifact_key, artifact in publication.artifacts.items():
+                build_result = build_artifact(artifact)
+                publication.artifacts[artifact_key] = build_result
+
+
+def publish(collections, destination):
+    """Copy all of the build results to a destination directory.
+
+    An artifact's destination is determined using the following "formula":
+
+        <collection_key>/<publication_key>/artifact.file
+
+    Since the collection key and publication key can contain slashes, the
+    path may be of an arbitrary depth.
+
+    """
+    for collection_key, collection in collections.items():
+        for publication_key, publication in collection.publications.items():
+            for artifact_key, artifact_build in publication.artifacts.items():
+                pass
