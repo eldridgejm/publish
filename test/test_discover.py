@@ -70,7 +70,7 @@ def test_discover_loads_artifacts():
     # then
     assert (
         collections["homeworks"].publications["01-intro"].artifacts["solution"].recipe
-        == "make solution"
+        == "touch solution.pdf"
     )
 
 
@@ -117,7 +117,7 @@ def test_discover_uses_relative_paths_as_keys():
 
 def test_discover_ignore_directories():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY, ignore={'textbook'})
+    collections = publish.discover(EXAMPLE_1_DIRECTORY, ignore={"textbook"})
 
     # then
-    assert 'textbook' not in collections
+    assert "textbook" not in collections

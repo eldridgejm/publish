@@ -229,6 +229,65 @@ def test_read_publication_with_relative_release_time(write_file):
                 solution:
                     file: ./solution.pdf
                     recipe: make solution
+                    release_time: metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"]
+    assert publication.artifacts["solution"].release_time == expected
+
+
+def test_read_publication_with_relative_release_date(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: metadata.released
+            """
+        ),
+    )
+
+    # then
+    with raises(publish.SchemaError):
+        publication = publish.read_publication_file(path)
+
+
+def test_read_publication_with_relative_release_time_after(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
                     release_time: 1 day after metadata.due
             """
         ),
@@ -240,6 +299,7 @@ def test_read_publication_with_relative_release_time(write_file):
     # then
     expected = publication.metadata["due"] + datetime.timedelta(days=1)
     assert publication.artifacts["solution"].release_time == expected
+
 
 def test_read_publication_with_relative_release_date_before(write_file):
     # given
@@ -331,7 +391,9 @@ def test_read_publication_with_invalid_relative_date_raises(write_file):
         publication = publish.read_publication_file(path)
 
 
-def test_read_publication_with_invalid_relative_date_variable_reference_raises(write_file):
+def test_read_publication_with_invalid_relative_date_variable_reference_raises(
+    write_file,
+):
     # given
     path = write_file(
         "publish.yaml",
@@ -357,7 +419,6 @@ def test_read_publication_with_invalid_relative_date_variable_reference_raises(w
     # when
     with raises(publish.SchemaError):
         publication = publish.read_publication_file(path)
-
 
 
 def test_read_publication_with_absolute_release_time(write_file):
@@ -388,7 +449,7 @@ def test_read_publication_with_absolute_release_time(write_file):
 
     # then
     expected = datetime.datetime(2020, 1, 2, 23, 59, 0)
-    assert publication.artifacts['solution'].release_time == expected
+    assert publication.artifacts["solution"].release_time == expected
 
 
 # validate_publication

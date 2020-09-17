@@ -5,4 +5,4 @@ metadata:
 artifacts:
     textbook:
         file: ./book.pdf
-        recipe: nothin
+        recipe: touch book.pdf
