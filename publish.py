@@ -45,11 +45,11 @@ class Error(Exception):
 
 
 class SchemaError(Error):
-    """Invalid configuration file."""
+    """Publication does not satisfy schema."""
 
 
-class PublicationError(Error):
-    """Publication does not fit within collection."""
+class InvalidFileError(Error):
+    """A configuration file is not valid."""
 
 
 class BuildError(Error):
@@ -97,9 +97,33 @@ class Publication(typing.NamedTuple):
     # a dictionary of artifacts
     artifacts: typing.Mapping[str, Artifact]
 
+    def _deep_asdict(self):
+        return {
+            "metadata": self.metadata,
+            "artifacts": {k: a._asdict() for (k, a) in self.artifacts.items()},
+        }
 
-class Collection:
-    """A collection of publications.
+
+class Collection(typing.NamedTuple):
+    """A collection."""
+
+    # the schema that publications should follow
+    schema: "Schema"
+
+    # a dictionary of publications
+    publications: typing.Mapping[str, Publication]
+
+    def _deep_asdict(self):
+        return {
+            "schema": self.schema._asdict(),
+            "publications": {
+                k: p._deep_asdict() for (k, p) in self.publications.items()
+            },
+        }
+
+
+class Schema(typing.NamedTuple):
+    """Rules governing publications.
 
     Attributes
     ----------
@@ -113,74 +137,65 @@ class Collection:
     metadata_schema : dict
         A dictionary describing a schema used to validate publication metadata. In the
         style of cerberus. If None, no validation will be performed. Default: None.
-    publications : dict
-        A dictionary of publications.
 
     """
 
-    def __init__(
-        self,
-        required_artifacts,
-        metadata_schema=None,
-        optional_artifacts=None,
-        allow_unspecified_artifacts=False,
-        publications=None,
-    ):
-        self.required_artifacts = required_artifacts
-        self.metadata_schema = metadata_schema
-        self.optional_artifacts = (
-            [] if optional_artifacts is None else optional_artifacts
-        )
-        self.allow_unspecified_artifacts = allow_unspecified_artifacts
-        self.publications = {} if publications is None else publications
+    required_artifacts: typing.Collection[str]
+    optional_artifacts: typing.Collection[str] = None
+    metadata_schema: typing.Mapping[str, typing.Mapping] = None
+    allow_unspecified_artifacts: bool = False
 
-    def validate(self, publication):
-        """Make sure that a publication fits within the collection.
 
-        Check's the publication's metadata dictionary against
-        collection.metadata_schema. Verifies that all required artifacts are provided,
-        and that no unknown artifacts are given (unless
-        collection.allow_unspecified_artifacts == True).
+def validate(publication, against):
+    """Make sure that a publication fits within the collection.
 
-        Parameters
-        ----------
-        publication : Publication
-            A fully-specified publication.
+    Check's the publication's metadata dictionary against
+    collection.metadata_schema. Verifies that all required artifacts are provided,
+    and that no unknown artifacts are given (unless
+    collection.allow_unspecified_artifacts == True).
 
-        Raises
-        ------
-        PublicationError
-            If the publication does not satisfy the collection's constraints.
+    Parameters
+    ----------
+    publication : Publication
+        A fully-specified publication.
 
-        """
-        # if there is a metadata schema, enforce it
-        if self.metadata_schema is not None:
-            validator = cerberus.Validator(self.metadata_schema, require_all=True)
-            validated = validator.validated(publication.metadata)
-            if validated is None:
-                raise PublicationError(f"Invalid metadata. {validator.errors}")
+    Raises
+    ------
+    SchemaError
+        If the publication does not satisfy the collection's constraints.
 
-        # ensure that all required artifacts are present
-        required = set(self.required_artifacts)
-        optional = set(self.optional_artifacts)
-        provided = set(publication.artifacts)
-        extra = provided - (required | optional)
+    """
+    schema = against
 
-        if required - provided:
-            raise PublicationError(
-                f"Required artifacts omitted: {required - provided}."
-            )
+    # make an iterable default for optional artifacts
+    if schema.optional_artifacts is None:
+        schema = schema._replace(optional_artifacts={})
 
-        if extra and not self.allow_unspecified_artifacts:
-            raise PublicationError(
-                f"Unknown artifacts provided: {provided - optional}."
-            )
+    # if there is a metadata schema, enforce it
+    if schema.metadata_schema is not None:
+        validator = cerberus.Validator(schema.metadata_schema, require_all=True)
+        validated = validator.validated(publication.metadata)
+        if validated is None:
+            raise SchemaError(f"Invalid metadata. {validator.errors}")
+
+    # ensure that all required artifacts are present
+    required = set(schema.required_artifacts)
+    optional = set(schema.optional_artifacts)
+    provided = set(publication.artifacts)
+    extra = provided - (required | optional)
+
+    if required - provided:
+        raise SchemaError(f"Required artifacts omitted: {required - provided}.")
+
+    if extra and not schema.allow_unspecified_artifacts:
+        raise SchemaError(f"Unknown artifacts provided: {provided - optional}.")
 
 
 def read_collection_file(path):
     """Read a Collection from a yaml file.
 
-    The file should have the following keys:
+    The file should have one key, "schema", whose value is a dictionary with
+    the following keys/values:
 
     - required_artifacts
         A list of artifacts names that are required
@@ -212,23 +227,30 @@ def read_collection_file(path):
     # 'required_artifacts' field.
     validator = cerberus.Validator(
         {
-            "required_artifacts": {
-                "type": "list",
-                "schema": {"type": "string"},
-                "required": True,
-            },
-            "optional_artifacts": {
-                "type": "list",
-                "schema": {"type": "string"},
-                "default": [],
-            },
-            "metadata_schema": {
-                "type": "dict",
-                "required": False,
-                "nullable": True,
-                "default": None,
-            },
-            "allow_unspecified_artifacts": {"type": "boolean", "default": False},
+            "schema": {
+                "schema": {
+                    "required_artifacts": {
+                        "type": "list",
+                        "schema": {"type": "string"},
+                        "required": True,
+                    },
+                    "optional_artifacts": {
+                        "type": "list",
+                        "schema": {"type": "string"},
+                        "default": [],
+                    },
+                    "metadata_schema": {
+                        "type": "dict",
+                        "required": False,
+                        "nullable": True,
+                        "default": None,
+                    },
+                    "allow_unspecified_artifacts": {
+                        "type": "boolean",
+                        "default": False,
+                    },
+                },
+            }
         },
         require_all=True,
     )
@@ -237,16 +259,17 @@ def read_collection_file(path):
     validated_contents = validator.validated(contents)
 
     if validated_contents is None:
-        raise SchemaError(f"Error loading {path}. {validator.errors}")
+        raise InvalidFileError(f"Error loading {path}. {validator.errors}")
 
     # make sure that the metadata schema is valid
-    if validated_contents["metadata_schema"] is not None:
+    if validated_contents["schema"]["metadata_schema"] is not None:
         try:
-            cerberus.Validator(validated_contents["metadata_schema"])
+            cerberus.Validator(validated_contents["schema"]["metadata_schema"])
         except Exception as exc:
-            raise SchemaError(f"Error loading {path}. Invalid metadata schema. {exc}")
+            raise InvalidFileError(f"Error loading {path}. Invalid metadata schema. {exc}")
 
-    return Collection(publications={}, **validated_contents)
+    schema = Schema(**validated_contents["schema"])
+    return Collection(schema=schema, publications={})
 
 
 def _parse_release_time(s, metadata):
@@ -285,12 +308,12 @@ def _parse_release_time(s, metadata):
         days, before_or_after, variable = long_match.groups()
         factor = -1 if before_or_after == "before" else 1
     else:
-        raise SchemaError("Invalid relative date string.")
+        raise ValueError("Invalid relative date string.")
 
     if variable not in metadata or not isinstance(
         metadata[variable], datetime.datetime
     ):
-        raise SchemaError(f"Invalid reference variable '{variable}'. Not a datetime.")
+        raise ValueError(f"Invalid reference variable '{variable}'. Not a datetime.")
 
     delta = datetime.timedelta(days=factor * int(days))
     return metadata[variable] + delta
@@ -342,7 +365,7 @@ def read_publication_file(path):
     validated = validator.validated(contents)
 
     if validated is None:
-        raise SchemaError(f"Problem reading {path}: {validator.errors}")
+        raise InvalidFileError(f"Problem reading {path}: {validator.errors}")
 
     metadata = validated["metadata"]
 
@@ -354,8 +377,8 @@ def read_publication_file(path):
             definition["release_time"] = _parse_release_time(
                 definition["release_time"], metadata
             )
-        except SchemaError as exc:
-            raise SchemaError(f"Error reading {path}: {exc}")
+        except ValueError as exc:
+            raise InvalidFileError(f"Error reading {path}: {exc}")
         artifacts[key] = Artifact(workdir=path.parent.absolute(), **definition)
 
     return Publication(metadata=metadata, artifacts=artifacts)
@@ -401,11 +424,12 @@ def discover(root: pathlib.Path, default_collection=None, ignore=None):
 
     """
     if default_collection is None:
-        default_collection = Collection(
+        default_schema = Schema(
             required_artifacts=[],
             metadata_schema=None,
             allow_unspecified_artifacts=True,
         )
+        default_collection = Collection(schema=default_schema, publications={})
 
     if ignore is None:
         ignore = set()
@@ -432,7 +456,7 @@ def discover(root: pathlib.Path, default_collection=None, ignore=None):
         if collection_file.is_file():
             # make sure we do not have nested collections
             if parent_collection is not default_collection:
-                raise SchemaError(f"Nested collection found at {collection_file}.")
+                raise InvalidFileError(f"Nested collection found at {collection_file}.")
             # update the parent collection
             parent_collection = read_collection_file(collection_file)
             key = str(directory.relative_to(root))
@@ -443,9 +467,9 @@ def discover(root: pathlib.Path, default_collection=None, ignore=None):
         if publication_file.is_file():
             publication = read_publication_file(publication_file)
             try:
-                parent_collection.validate(publication)
-            except PublicationError as exc:
-                raise SchemaError(f"Problem reading {publication_file}: {exc}")
+                validate(publication, against=parent_collection.schema)
+            except SchemaError as exc:
+                raise InvalidFileError(f"Problem reading {publication_file}: {exc}")
             key = str(directory.relative_to(parent_collection_path))
             parent_collection.publications[key] = publication
 

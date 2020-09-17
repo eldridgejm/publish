@@ -1,12 +1,15 @@
-required_artifacts:
-    - homework
-    - solution
+schema:
+    required_artifacts:
+        - homework
+        - solution
 
-optional_artifacts:
-    - template
+    optional_artifacts:
+        - template
 
-metadata_schema: |
-    name: str()
-    due: timestamp()
-    released: day()
-    artifacts: include('artifacts')
+    metadata_schema:
+        name:
+            type: string
+        due:
+            type: datetime
+        released: 
+            type: date

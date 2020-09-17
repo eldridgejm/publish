@@ -33,18 +33,19 @@ def test_read_collection_example(write_file):
         "collection.yaml",
         contents=dedent(
             """
-            required_artifacts:
-                - homework
-                - solution
+            schema:
+                required_artifacts:
+                    - homework
+                    - solution
 
-            optional_artifacts:
-                - template
+                optional_artifacts:
+                    - template
 
-            metadata_schema:
-                name: 
-                    type: string
-                due:
-                    type: date
+                metadata_schema:
+                    name: 
+                        type: string
+                    due:
+                        type: date
             """
         ),
     )
@@ -53,9 +54,9 @@ def test_read_collection_example(write_file):
     collection = publish.read_collection_file(path)
 
     # then
-    assert collection.required_artifacts == ["homework", "solution"]
-    assert collection.optional_artifacts == ["template"]
-    assert collection.metadata_schema["name"]["type"] == "string"
+    assert collection.schema.required_artifacts == ["homework", "solution"]
+    assert collection.schema.optional_artifacts == ["template"]
+    assert collection.schema.metadata_schema["name"]["type"] == "string"
 
 
 def test_read_collection_validates_fields(write_file):
@@ -63,23 +64,24 @@ def test_read_collection_validates_fields(write_file):
         "collection.yaml",
         contents=dedent(
             """
-            # this ain't right..., should be a list of str
-            required_artifacts: 42
+            schema:
+                # this ain't right..., should be a list of str
+                required_artifacts: 42
 
-            optional_artifacts:
-                - template
+                optional_artifacts:
+                    - template
 
-            metadata_schema:
-                name: 
-                    type: string
-                due:
-                    type: date
+                metadata_schema:
+                    name: 
+                        type: string
+                    due:
+                        type: date
             """
         ),
     )
 
     # then
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         collection = publish.read_collection_file(path)
 
 
@@ -88,22 +90,23 @@ def test_read_collection_requires_required_artifacts(write_file):
         "collection.yaml",
         contents=dedent(
             """
-            # this ain't right..., should have required_artifacts...
+            schema:
+                # this ain't right..., should have required_artifacts...
 
-            optional_artifacts:
-                - template
+                optional_artifacts:
+                    - template
 
-            metadata_schema:
-                name: 
-                    type: string
-                due:
-                    type: date
+                metadata_schema:
+                    name: 
+                        type: string
+                    due:
+                        type: date
             """
         ),
     )
 
     # then
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         collection = publish.read_collection_file(path)
 
 
@@ -113,15 +116,16 @@ def test_read_collection_doesnt_require_optional_artifacts(write_file):
         "collection.yaml",
         contents=dedent(
             """
-            required_artifacts:
-                - foo
-                - bar
+            schema:
+                required_artifacts:
+                    - foo
+                    - bar
 
-            metadata_schema:
-                name: 
-                    type: string
-                due:
-                    type: date
+                metadata_schema:
+                    name: 
+                        type: string
+                    due:
+                        type: date
             """
         ),
     )
@@ -130,7 +134,7 @@ def test_read_collection_doesnt_require_optional_artifacts(write_file):
     collection = publish.read_collection_file(path)
 
     # then
-    assert collection.optional_artifacts == []
+    assert collection.schema.optional_artifacts == []
 
 
 def test_read_collection_doesnt_require_metadata_schema(write_file):
@@ -139,9 +143,10 @@ def test_read_collection_doesnt_require_metadata_schema(write_file):
         "collection.yaml",
         contents=dedent(
             """
-            required_artifacts:
-                - foo
-                - bar
+            schema:
+                required_artifacts:
+                    - foo
+                    - bar
             """
         ),
     )
@@ -150,7 +155,7 @@ def test_read_collection_doesnt_require_metadata_schema(write_file):
     collection = publish.read_collection_file(path)
 
     # then
-    assert collection.metadata_schema is None
+    assert collection.schema.metadata_schema is None
 
 
 def test_read_collection_raises_on_invalid_metadata_schema(write_file):
@@ -159,19 +164,20 @@ def test_read_collection_raises_on_invalid_metadata_schema(write_file):
         "collection.yaml",
         contents=dedent(
             """
-            required_artifacts:
-                - foo
-                - bar
+            schema:
+                required_artifacts:
+                    - foo
+                    - bar
 
-            metadata_schema:
-                foo: 1
-                bar: 2
+                metadata_schema:
+                    foo: 1
+                    bar: 2
             """
         ),
     )
 
     # when then
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         collection = publish.read_collection_file(path)
 
 
@@ -266,7 +272,7 @@ def test_read_publication_with_relative_release_date(write_file):
     )
 
     # then
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         publication = publish.read_publication_file(path)
 
 
@@ -387,7 +393,7 @@ def test_read_publication_with_invalid_relative_date_raises(write_file):
     )
 
     # when
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         publication = publish.read_publication_file(path)
 
 
@@ -417,7 +423,7 @@ def test_read_publication_with_invalid_relative_date_variable_reference_raises(
     )
 
     # when
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         publication = publish.read_publication_file(path)
 
 
@@ -473,10 +479,9 @@ def test_validate_publication_checks_required_artifacts():
         },
     )
 
-    collection = publish.Collection(
+    schema = publish.Schema(
         required_artifacts=["homework", "solution"],
         optional_artifacts=[],
-        publications={},
         allow_unspecified_artifacts=False,
         metadata_schema={
             "name": {"type": "string"},
@@ -486,8 +491,8 @@ def test_validate_publication_checks_required_artifacts():
     )
 
     # when / then
-    with raises(publish.PublicationError):
-        collection.validate(publication)
+    with raises(publish.SchemaError):
+        publish.validate(publication, against=schema)
 
 
 def test_validate_publication_does_not_allow_extra_artifacts(write_file):
@@ -517,10 +522,9 @@ def test_validate_publication_does_not_allow_extra_artifacts(write_file):
         },
     )
 
-    collection = publish.Collection(
+    schema = publish.Schema(
         required_artifacts=["homework", "solution"],
         optional_artifacts=[],
-        publications={},
         allow_unspecified_artifacts=False,
         metadata_schema={
             "name": {"type": "string"},
@@ -530,8 +534,8 @@ def test_validate_publication_does_not_allow_extra_artifacts(write_file):
     )
 
     # when / then
-    with raises(publish.PublicationError):
-        collection.validate(publication)
+    with raises(publish.SchemaError):
+        publish.validate(publication, against=schema)
 
 
 def test_validate_publication_allow_unspecified_artifacts(write_file):
@@ -561,10 +565,9 @@ def test_validate_publication_allow_unspecified_artifacts(write_file):
         },
     )
 
-    collection = publish.Collection(
+    schema = publish.Schema(
         required_artifacts=[],
         optional_artifacts=[],
-        publications={},
         allow_unspecified_artifacts=True,
         metadata_schema={
             "name": {"type": "string"},
@@ -574,7 +577,7 @@ def test_validate_publication_allow_unspecified_artifacts(write_file):
     )
 
     # when
-    collection.validate(publication)
+    publish.validate(publication, against=schema)
 
 
 def test_validate_publication_validates_metadata(write_file):
@@ -599,10 +602,9 @@ def test_validate_publication_validates_metadata(write_file):
         },
     )
 
-    collection = publish.Collection(
+    schema = publish.Schema(
         required_artifacts=["homework", "solution"],
         optional_artifacts=[],
-        publications={},
         allow_unspecified_artifacts=True,
         metadata_schema={
             "name": {"type": "string"},
@@ -612,8 +614,8 @@ def test_validate_publication_validates_metadata(write_file):
     )
 
     # when
-    with raises(publish.PublicationError):
-        collection.validate(publication)
+    with raises(publish.SchemaError):
+        publish.validate(publication, against=schema)
 
 
 def test_validate_publication_requires_metadata_if_schema_provided(write_file):
@@ -634,10 +636,9 @@ def test_validate_publication_requires_metadata_if_schema_provided(write_file):
         },
     )
 
-    collection = publish.Collection(
+    schema = publish.Schema(
         required_artifacts=["homework", "solution"],
         optional_artifacts=[],
-        publications={},
         allow_unspecified_artifacts=True,
         metadata_schema={
             "name": {"type": "string"},
@@ -647,8 +648,8 @@ def test_validate_publication_requires_metadata_if_schema_provided(write_file):
     )
 
     # when
-    with raises(publish.PublicationError):
-        collection.validate(publication)
+    with raises(publish.SchemaError):
+        publish.validate(publication, against=schema)
 
 
 def test_validate_publication_doesnt_require_metadata_if_schema_not_provided(
@@ -671,16 +672,15 @@ def test_validate_publication_doesnt_require_metadata_if_schema_not_provided(
         },
     )
 
-    collection = publish.Collection(
+    schema = publish.Schema(
         required_artifacts=["homework", "solution"],
         optional_artifacts=[],
-        publications={},
         allow_unspecified_artifacts=True,
         metadata_schema={},
     )
 
     # when
-    collection.validate(publication)
+    publish.validate(publication, against=schema)
 
 
 def test_validate_publication_accepts_metadata_if_schema_not_provided(write_file):
@@ -701,16 +701,15 @@ def test_validate_publication_accepts_metadata_if_schema_not_provided(write_file
         },
     )
 
-    collection = publish.Collection(
+    schema = publish.Schema(
         required_artifacts=["homework", "solution"],
         optional_artifacts=[],
-        publications={},
         allow_unspecified_artifacts=True,
         metadata_schema=None,
     )
 
     # when
-    collection.validate(publication)
+    publish.validate(publication, against=schema)
 
     # then
     assert publication.metadata["name"] == "foo"

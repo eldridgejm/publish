@@ -1,1 +1,2 @@
-required_artifacts: [ foo ]
+schema:
+    required_artifacts: [ foo ]

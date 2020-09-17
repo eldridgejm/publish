@@ -92,17 +92,17 @@ def test_discover_loads_dates_as_dates():
 
 def test_discover_validates_collection_schema():
     # when run on a malformed collection.yaml
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         publish.discover(EXAMPLE_2_DIRECTORY)
 
 
 def test_discover_validates_publication_schema():
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         publish.discover(EXAMPLE_3_DIRECTORY)
 
 
 def test_dicover_raises_when_nested_collections_discovered():
-    with raises(publish.SchemaError):
+    with raises(publish.InvalidFileError):
         publish.discover(EXAMPLE_4_DIRECTORY)
 
 
