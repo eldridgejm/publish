@@ -471,7 +471,7 @@ def test_validate_publication_checks_required_artifacts():
             "released": datetime.date(2020, 9, 1),
         },
         artifacts={
-            "homework": publish.Artifact(
+            "homework": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./homework.pdf",
                 recipe="make homework",
@@ -504,17 +504,17 @@ def test_validate_publication_does_not_allow_extra_artifacts(write_file):
             "released": datetime.date(2020, 9, 1),
         },
         artifacts={
-            "homework": publish.Artifact(
+            "homework": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./homework.pdf",
                 recipe="make homework",
             ),
-            "solution": publish.Artifact(
+            "solution": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./solution.pdf",
                 recipe="make solution",
             ),
-            "extra": publish.Artifact(
+            "extra": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./solution.pdf",
                 recipe="make solution",
@@ -547,17 +547,17 @@ def test_validate_publication_allow_unspecified_artifacts(write_file):
             "released": datetime.date(2020, 9, 1),
         },
         artifacts={
-            "homework": publish.Artifact(
+            "homework": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./homework.pdf",
                 recipe="make homework",
             ),
-            "solution": publish.Artifact(
+            "solution": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./solution.pdf",
                 recipe="make solution",
             ),
-            "extra": publish.Artifact(
+            "extra": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./solution.pdf",
                 recipe="make solution",
@@ -589,12 +589,12 @@ def test_validate_publication_validates_metadata(write_file):
             "released": datetime.date(2020, 9, 1),
         },
         artifacts={
-            "homework": publish.Artifact(
+            "homework": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./homework.pdf",
                 recipe="make homework",
             ),
-            "solution": publish.Artifact(
+            "solution": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./solution.pdf",
                 recipe="make solution",
@@ -623,12 +623,12 @@ def test_validate_publication_requires_metadata_if_schema_provided(write_file):
     publication = publish.Publication(
         metadata={},
         artifacts={
-            "homework": publish.Artifact(
+            "homework": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./homework.pdf",
                 recipe="make homework",
             ),
-            "solution": publish.Artifact(
+            "solution": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./solution.pdf",
                 recipe="make solution",
@@ -659,12 +659,12 @@ def test_validate_publication_doesnt_require_metadata_if_schema_not_provided(
     publication = publish.Publication(
         metadata={},
         artifacts={
-            "homework": publish.Artifact(
+            "homework": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./homework.pdf",
                 recipe="make homework",
             ),
-            "solution": publish.Artifact(
+            "solution": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./solution.pdf",
                 recipe="make solution",
@@ -688,12 +688,12 @@ def test_validate_publication_accepts_metadata_if_schema_not_provided(write_file
     publication = publish.Publication(
         metadata={"name": "foo"},
         artifacts={
-            "homework": publish.Artifact(
+            "homework": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./homework.pdf",
                 recipe="make homework",
             ),
-            "solution": publish.Artifact(
+            "solution": publish.ArtifactInputs(
                 workdir=pathlib.Path.cwd(),
                 file="./solution.pdf",
                 recipe="make solution",
