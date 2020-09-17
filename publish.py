@@ -24,9 +24,11 @@ the homework's solutions.
 
 from collections import deque, namedtuple
 from textwrap import dedent
+import copy
 import datetime
 import pathlib
 import re
+import shutil
 import subprocess
 import typing
 import yaml
@@ -546,14 +548,14 @@ def _all_artifacts(collections):
 
 def build(collections):
     """Convenience function to build all of the artifacts in the collections."""
-    for collection_key, collection in collections.items():
-        for publication_key, publication in collection.publications.items():
-            for artifact_key, artifact in publication.artifacts.items():
-                build_result = build_artifact(artifact)
-                publication.artifacts[artifact_key] = build_result
+    collections = copy.deepcopy(collections)
+    for x in _all_artifacts(collections):
+        build_result = build_artifact(x.artifact)
+        x.publication.artifacts[x.artifact_key] = build_result
+    return collections
 
 
-def publish(collections, destination):
+def publish(collections, outdir):
     """Copy all of the build results to a destination directory.
 
     An artifact's destination is determined using the following "formula":
@@ -564,7 +566,31 @@ def publish(collections, destination):
     path may be of an arbitrary depth.
 
     """
-    for collection_key, collection in collections.items():
-        for publication_key, publication in collection.publications.items():
-            for artifact_key, artifact_build in publication.artifacts.items():
-                pass
+    published_collections = copy.deepcopy(collections)
+    unreleased = set()
+
+    for x in _all_artifacts(published_collections):
+        # if it wasn't released, we shouldn't publish it
+        if not x.artifact.is_released:
+            unreleased.add((x.collection_key, x.publication_key, x.artifact_key))
+            continue
+
+        # actually copy the artifact
+        relative_dst = (
+            pathlib.Path(x.collection_key) / x.publication_key / x.artifact.file
+        )
+        full_dst = outdir / relative_dst
+        full_dst.parent.mkdir(parents=True, exist_ok=True)
+        full_src = x.artifact.workdir / x.artifact.file
+        shutil.copy(full_src, full_dst)
+
+        # update the result
+        x.publication.artifacts[x.artifact_key] = relative_dst
+
+    # remove all unreleased artifacts
+    for (collection_key, publication_key, artifact_key) in unreleased:
+        collection = published_collections[collection_key]
+        publication = collection.publications[publication_key]
+        del publication.artifacts[artifact_key]
+
+    return published_collections

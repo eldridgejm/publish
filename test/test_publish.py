@@ -25,11 +25,37 @@ def outdir(tmpdir):
 def test_publish(example_1, outdir):
     # given
     collection = publish.discover(example_1)
-    build_results = publish.build(collection)
+    built_collections = publish.build(collection)
 
     # when
-    publish.publish(build_results, outdir)
+    published_collections = publish.publish(built_collections, outdir)
 
     # then
     assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
-    assert (outdir / "homeworks" / "02-intro" / "build" / "solution.pdf").exists()
+    assert (outdir / "homeworks" / "02-python" / "build" / "solution.pdf").exists()
+
+    assert (
+        "homework"
+        in published_collections["homeworks"].publications["01-intro"].artifacts
+    )
+
+
+def test_only_publish_if_released(example_1, outdir):
+    # given
+    collection = publish.discover(example_1)
+    built_collections = publish.build(collection)
+    publication = built_collections["homeworks"].publications["02-python"]
+    new = publication.artifacts["solution"]._replace(is_released=False)
+    publication.artifacts["solution"] = new
+
+    # when
+    published_collections = publish.publish(built_collections, outdir)
+
+    # then
+    assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
+    assert not (outdir / "homeworks" / "02-python" / "build" / "solution.pdf").exists()
+
+    assert (
+        "solution"
+        not in published_collections["homeworks"].publications["02-python"].artifacts
+    )

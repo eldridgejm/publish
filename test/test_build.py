@@ -126,11 +126,21 @@ def test_build_collection(example_1):
     collections = publish.discover(example_1)
 
     # when
-    result = publish.build(collections)
+    built_collection = publish.build(collections)
 
     # then
     assert (example_1 / "homeworks" / "01-intro" / "solution.pdf").exists()
     build_result = (
-        collections["homeworks"].publications["01-intro"].artifacts["solution"]
+        built_collection["homeworks"].publications["01-intro"].artifacts["solution"]
     )
     assert build_result.is_released
+    assert (
+        built_collection["homeworks"]
+        .publications["01-intro"]
+        .artifacts["solution"]
+        .is_released
+    )
+
+    # check that a deep copy is made
+    del collections["homeworks"]
+    assert "homeworks" in built_collection
