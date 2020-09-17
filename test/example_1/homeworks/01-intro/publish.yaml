@@ -1,6 +1,7 @@
-name: Homework 01
-due: 2020-09-10 23:59:00
-released: 2020-09-01
+metadata:
+    name: Homework 01
+    due: 2020-09-10 23:59:00
+    released: 2020-09-01
 
 artifacts:
     homework:
@@ -9,4 +10,3 @@ artifacts:
     solution:
         file: ./build/solution.pdf
         recipe: make solution
-        released: 2020-09-15 23:59:00

@@ -1,5 +1,8 @@
-name: Textbook
-author: Justin Eldridge
+metadata:
+    name: Textbook
+    author: Justin Eldridge
+
 artifacts:
     textbook:
         file: ./book.pdf
+        recipe: nothin

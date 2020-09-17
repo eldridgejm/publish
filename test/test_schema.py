@@ -179,7 +179,7 @@ def test_read_collection_raises_on_invalid_metadata_schema(write_file):
 # -----------------------------------------------------------------------------
 
 
-def test_read_publication_example_with_collection(write_file):
+def test_read_publication_example(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -201,18 +201,6 @@ def test_read_publication_example_with_collection(write_file):
         ),
     )
 
-    collection = publish.Collection(
-        required_artifacts=["homework", "solution"],
-        optional_artifacts=[],
-        publications={},
-        allow_unspecified_artifacts=False,
-        metadata_schema={
-            "name": {"type": "string"},
-            "due": {"type": "datetime"},
-            "released": {"type": "date"},
-        },
-    )
-
     # when
     publication = publish.read_publication_file(path)
 
@@ -221,6 +209,186 @@ def test_read_publication_example_with_collection(write_file):
     assert isinstance(publication.metadata["due"], datetime.datetime)
     assert isinstance(publication.metadata["released"], datetime.date)
     assert publication.artifacts["homework"].recipe == "make homework"
+
+
+def test_read_publication_with_relative_release_time(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 1 day after metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] + datetime.timedelta(days=1)
+    assert publication.artifacts["solution"].release_time == expected
+
+def test_read_publication_with_relative_release_date_before(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 3 days before metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] - datetime.timedelta(days=3)
+    assert publication.artifacts["solution"].release_time == expected
+
+
+def test_read_publication_with_relative_release_time_multiple_days(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 3 days after metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] + datetime.timedelta(days=3)
+    assert publication.artifacts["solution"].release_time == expected
+
+
+def test_read_publication_with_invalid_relative_date_raises(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: -1 days after metadata.due
+            """
+        ),
+    )
+
+    # when
+    with raises(publish.SchemaError):
+        publication = publish.read_publication_file(path)
+
+
+def test_read_publication_with_invalid_relative_date_variable_reference_raises(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 1 days after metadata.foo
+            """
+        ),
+    )
+
+    # when
+    with raises(publish.SchemaError):
+        publication = publish.read_publication_file(path)
+
+
+
+def test_read_publication_with_absolute_release_time(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 2020-01-02 23:59:00
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = datetime.datetime(2020, 1, 2, 23, 59, 0)
+    assert publication.artifacts['solution'].release_time == expected
 
 
 # validate_publication
@@ -257,8 +425,8 @@ def test_validate_publication_checks_required_artifacts():
     )
 
     # when / then
-    with raises(publish.SchemaError):
-        publish.validate_publication(publication, collection)
+    with raises(publish.PublicationError):
+        collection.validate(publication)
 
 
 def test_validate_publication_does_not_allow_extra_artifacts(write_file):
@@ -301,8 +469,8 @@ def test_validate_publication_does_not_allow_extra_artifacts(write_file):
     )
 
     # when / then
-    with raises(publish.SchemaError):
-        publish.validate_publication(publication, collection)
+    with raises(publish.PublicationError):
+        collection.validate(publication)
 
 
 def test_validate_publication_allow_unspecified_artifacts(write_file):
@@ -345,7 +513,7 @@ def test_validate_publication_allow_unspecified_artifacts(write_file):
     )
 
     # when
-    publish.validate_publication(publication, collection)
+    collection.validate(publication)
 
 
 def test_validate_publication_validates_metadata(write_file):
@@ -383,8 +551,8 @@ def test_validate_publication_validates_metadata(write_file):
     )
 
     # when
-    with raises(publish.SchemaError):
-        publish.validate_publication(publication, collection)
+    with raises(publish.PublicationError):
+        collection.validate(publication)
 
 
 def test_validate_publication_requires_metadata_if_schema_provided(write_file):
@@ -418,8 +586,8 @@ def test_validate_publication_requires_metadata_if_schema_provided(write_file):
     )
 
     # when
-    with raises(publish.SchemaError):
-        publish.validate_publication(publication, collection)
+    with raises(publish.PublicationError):
+        collection.validate(publication)
 
 
 def test_validate_publication_doesnt_require_metadata_if_schema_not_provided(
@@ -451,7 +619,7 @@ def test_validate_publication_doesnt_require_metadata_if_schema_not_provided(
     )
 
     # when
-    publish.validate_publication(publication, collection)
+    collection.validate(publication)
 
 
 def test_validate_publication_accepts_metadata_if_schema_not_provided(write_file):
@@ -481,7 +649,7 @@ def test_validate_publication_accepts_metadata_if_schema_not_provided(write_file
     )
 
     # when
-    publish.validate_publication(publication, collection)
+    collection.validate(publication)
 
     # then
     assert publication.metadata["name"] == "foo"

@@ -5,8 +5,10 @@ required_artifacts:
 optional_artifacts:
     - template
 
-metadata_schema: |
-    name: str()
-    due: timestamp()
-    released: day()
-    artifacts: include('artifacts')
+metadata_schema:
+    name:
+        type: string
+    due:
+        type: date
+    released: 
+        type: date
