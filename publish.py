@@ -217,6 +217,13 @@ class Publication(typing.NamedTuple):
             "artifacts": {k: a._asdict() for (k, a) in self.artifacts.items()},
         }
 
+    @property
+    def _children(self):
+        return self.artifacts
+
+    def _replace_children(self, new_children):
+        return self._replace(artifacts=new_children)
+
 
 class Collection(typing.NamedTuple):
     """A collection."""
@@ -236,11 +243,25 @@ class Collection(typing.NamedTuple):
             },
         }
 
+    @property
+    def _children(self):
+        return self.publications
+
+    def _replace_children(self, new_children):
+        return self._replace(publications=new_children)
+
 
 class Universe(typing.NamedTuple):
     """Container of all collections."""
 
     collections: typing.Mapping[str, Collection]
+
+    @property
+    def _children(self):
+        return self.collections
+
+    def _replace_children(self, new_children):
+        return self._replace(collections=new_children)
 
 
 class Schema(typing.NamedTuple):
@@ -779,7 +800,7 @@ class BuildCallbacks:
         """Called when the build succeeded."""
 
 
-def build_artifact(
+def _build_artifact(
     artifact,
     *,
     ignore_release_time=False,
@@ -842,64 +863,30 @@ def build_artifact(
     return output
 
 
-def build_publication(
-    publication, *, ignore_release_time=False, callbacks=BuildCallbacks()
+def build(
+    parent,
+    *,
+    ignore_release_time=False,
+    now=datetime.datetime.now,
+    run=subprocess.run,
+    exists=pathlib.Path.exists,
+    callbacks=BuildCallbacks(),
 ):
-    outputs = {}
-    for artifact_key, artifact in publication.artifacts.items():
-        callbacks.on_artifact(artifact_key, artifact)
-        outputs[artifact_key] = build_artifact(
-            artifact, ignore_release_time=ignore_release_time, callbacks=callbacks
-        )
-    return publication._replace(artifacts=outputs)
+    kwargs = dict(
+        ignore_release_time=ignore_release_time,
+        now=now,
+        run=run,
+        exists=exists,
+        callbacks=callbacks,
+    )
 
+    if isinstance(parent, UnbuiltArtifact):
+        return _build_artifact(parent, **kwargs)
 
-def build_collection(
-    collection, *, ignore_release_time=False, callbacks=BuildCallbacks()
-):
-    outputs = {}
-    for publication_key, publication in collection.publications.items():
-        callbacks.on_publication(publication_key, publication)
-        outputs[publication_key] = build_publication(
-            publication, ignore_release_time=ignore_release_time, callbacks=callbacks
-        )
-    return collection._replace(publications=outputs)
-
-
-def build(universe, ignore_release_time=False, callbacks=BuildCallbacks()):
-    outputs = {}
-    for collection_key, collection in universe.collections.items():
-        callbacks.on_collection(collection_key, collection)
-        outputs[collection_key] = build_collection(
-            collection, ignore_release_time=ignore_release_time, callbacks=callbacks
-        )
-    return Universe(outputs)
-
-
-def _build(parent):
     new_children = {}
-    for child_key, child in children(parent):
-        callback(child_key, child)
-        new_children[child_key] = _build(child)
-    return replace_children(parent, outputs)
-
-
-def _children(parent):
-    if isinstance(parent, dict):
-        return parent.items()
-    elif isinstance(parent, Collection):
-        return parent.publications.items()
-    elif isinstance(parent, Publication):
-        return parent.artifacts.items()
-
-
-def _replace_children(parent, new_children):
-    if isinstance(parent, dict):
-        return new_children
-    elif isinstance(parent, Collection):
-        return parent._replace(publications=new_children)
-    elif isinstance(parent, Publication):
-        return parent._replace(artifacts=new_children)
+    for child_key, child in parent._children.items():
+        new_children[child_key] = build(child, **kwargs)
+    return parent._replace_children(new_children)
 
 
 # publishing

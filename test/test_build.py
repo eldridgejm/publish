@@ -24,7 +24,7 @@ def test_build_artifact_integration(example_1):
     artifact = universe.collections["homeworks"].publications["01-intro"].artifacts["solution"]
 
     # when
-    result = publish.build_artifact(artifact)
+    result = publish.build(artifact)
 
     # then
     assert (example_1 / "homeworks" / "01-intro" / "solution.pdf").exists()
@@ -48,7 +48,7 @@ def test_build_artifact_when_release_time_is_in_future():
     now = Mock(return_value=datetime.datetime(2020, 1, 1, 0, 0, 0))
 
     # when
-    result = publish.build_artifact(artifact, run=run, now=now)
+    result = publish.build(artifact, run=run, now=now)
 
     # then
     assert not result.is_released
@@ -71,7 +71,7 @@ def test_build_artifact_when_release_time_is_in_future_ignore_release_time():
     exists = Mock(return_value=True)
 
     # when
-    result = publish.build_artifact(
+    result = publish.build(
         artifact, run=run, now=now, exists=exists, ignore_release_time=True
     )
 
@@ -88,7 +88,7 @@ def test_build_artifact_when_recipe_is_none():
     exists = Mock(return_value=True)
 
     # when
-    result = publish.build_artifact(artifact, run=run, exists=exists)
+    result = publish.build(artifact, run=run, exists=exists)
 
     # then
     assert result.is_released
@@ -104,7 +104,7 @@ def test_build_artifact_when_recipe_is_none_raises_if_no_file():
 
     # when
     with raises(publish.BuildError):
-        result = publish.build_artifact(artifact, run=run, exists=exists)
+        result = publish.build(artifact, run=run, exists=exists)
 
 
 def test_build_artifact_raises_if_no_file():
@@ -118,7 +118,7 @@ def test_build_artifact_raises_if_no_file():
 
     # when
     with raises(publish.BuildError):
-        result = publish.build_artifact(artifact, run=run, exists=exists)
+        result = publish.build(artifact, run=run, exists=exists)
 
 
 def test_build_collection(example_1):
