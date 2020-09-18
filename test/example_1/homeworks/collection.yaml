@@ -1,10 +1,10 @@
 schema:
     required_artifacts:
-        - homework
-        - solution
+        - homework.pdf
+        - solution.pdf
 
     optional_artifacts:
-        - template
+        - template.zip
 
     metadata_schema:
         name:

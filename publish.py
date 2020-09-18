@@ -498,7 +498,7 @@ def read_publication_file(path):
             "required": True,
             "valuesrules": {
                 "schema": {
-                    "file": {"type": "string"},
+                    "file": {"type": "string", "default": None, "nullable": True},
                     "recipe": {"type": "string", "default": None, "nullable": True},
                     "release_time": {
                         "type": ["datetime", "string"],
@@ -529,6 +529,11 @@ def read_publication_file(path):
             )
         except ValueError as exc:
             raise InvalidFileError(str(exc), path)
+
+        # if no file is provided, use the key
+        if definition['file'] is None:
+            definition['file'] = key
+
         artifacts[key] = UnbuiltArtifact(workdir=path.parent.absolute(), **definition)
 
     return Publication(metadata=metadata, artifacts=artifacts)
@@ -828,13 +833,13 @@ def build(
 # --------------------------------------------------------------------------------------
 
 
-def _publish_artifact(built_artifact, outdir, prefix=''):
+def _publish_artifact(built_artifact, outdir, filename):
 
     if not built_artifact.is_released:
         return PublishedArtifact(None)
 
     # actually copy the artifact
-    full_dst = outdir / prefix / built_artifact.file
+    full_dst = outdir / filename
     full_dst.parent.mkdir(parents=True, exist_ok=True)
     full_src = built_artifact.workdir / built_artifact.file
     shutil.copy(full_src, full_dst)
@@ -1018,8 +1023,8 @@ def cli(argv=None):
 
     published = publish(built, args.output_directory)
 
-    with (args.output_directory / "published.json").open("w") as fileobj:
-        fileobj.write(serialize(published))
+    # with (args.output_directory / "published.json").open("w") as fileobj:
+        # fileobj.write(serialize(published))
 
 
 if __name__ == "__main__":

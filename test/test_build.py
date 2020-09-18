@@ -21,7 +21,7 @@ def example_1(tmpdir):
 def test_build_artifact_integration(example_1):
     # given
     universe = publish.discover(example_1)
-    artifact = universe.collections["homeworks"].publications["01-intro"].artifacts["solution"]
+    artifact = universe.collections["homeworks"].publications["01-intro"].artifacts["solution.pdf"]
 
     # when
     result = publish.build(artifact)
@@ -131,13 +131,13 @@ def test_build_collection(example_1):
     # then
     assert (example_1 / "homeworks" / "01-intro" / "solution.pdf").exists()
     build_result = (
-        built_universe.collections["homeworks"].publications["01-intro"].artifacts["solution"]
+        built_universe.collections["homeworks"].publications["01-intro"].artifacts["solution.pdf"]
     )
     assert build_result.is_released
     assert (
         built_universe.collections["homeworks"]
         .publications["01-intro"]
-        .artifacts["solution"]
+        .artifacts["solution.pdf"]
         .is_released
     )
 

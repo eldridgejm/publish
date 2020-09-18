@@ -71,7 +71,7 @@ def test_discover_loads_artifacts():
     assert (
         universe.collections["homeworks"]
         .publications["01-intro"]
-        .artifacts["solution"]
+        .artifacts["solution.pdf"]
         .recipe
         == "touch solution.pdf"
     )
@@ -126,17 +126,31 @@ def test_discover_skip_directories():
     assert "textbook" not in universe.collections["default"]
 
 
-def test_discover_filter_artifacts():
+def test_discover_without_file_uses_key():
     # when
     universe = publish.discover(EXAMPLE_1_DIRECTORY)
-    universe = publish.filter_artifacts(universe, "solution")
 
     # then
     assert (
-        "homework"
+        universe.collections["homeworks"]
+        .publications["01-intro"]
+        .artifacts["homework.pdf"]
+        .file
+        == "homework.pdf"
+    )
+
+
+def test_discover_filter_artifacts():
+    # when
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
+    universe = publish.filter_artifacts(universe, "solution.pdf")
+
+    # then
+    assert (
+        "homework.pdf"
         not in universe.collections["homeworks"].publications["01-intro"].artifacts
     )
     assert (
-        "solution"
+        "solution.pdf"
         in universe.collections["homeworks"].publications["01-intro"].artifacts
     )

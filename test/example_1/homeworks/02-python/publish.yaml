@@ -4,9 +4,8 @@ metadata:
     released: 2020-09-01
 
 artifacts:
-    homework:
-        file: homework.pdf
+    homework.pdf:
         recipe: touch homework.pdf
-    solution:
-        file: ./build/solution.pdf
+    solution.pdf:
         recipe: mkdir build && touch build/solution.pdf
+        file: ./build/solution.pdf

@@ -3,6 +3,5 @@ metadata:
     author: Justin Eldridge
 
 artifacts:
-    textbook:
-        file: ./book.pdf
+    book.pdf:
         recipe: touch book.pdf

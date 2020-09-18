@@ -31,13 +31,13 @@ def test_publish(example_1, outdir):
     published = publish.publish(builts, outdir)
 
     # then
-    assert (outdir / "homeworks" / "01-intro" / "homework" / "homework.pdf").exists()
+    assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
     assert (
-        outdir / "homeworks" / "02-python" / "solution" / "build" / "solution.pdf"
+        outdir / "homeworks" / "02-python" / "solution.pdf"
     ).exists()
 
     assert (
-        "homework"
+        "homework.pdf"
         in published.collections["homeworks"].publications["01-intro"].artifacts
     )
 
@@ -47,16 +47,16 @@ def test_only_publish_if_released(example_1, outdir):
     discovered = publish.discover(example_1)
     built = publish.build(discovered)
     publication = built.collections["homeworks"].publications["02-python"]
-    new = publication.artifacts["solution"]._replace(is_released=False)
-    publication.artifacts["solution"] = new
+    new = publication.artifacts["solution.pdf"]._replace(is_released=False)
+    publication.artifacts["solution.pdf"] = new
 
     # when
     published = publish.publish(built, outdir)
 
     # then
-    assert (outdir / "homeworks" / "01-intro" / "homework" / "homework.pdf").exists()
+    assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
     assert not (
-        outdir / "homeworks" / "02-python" / "solution" / "build" / "solution.pdf"
+        outdir / "homeworks" / "02-python" / "solution.pdf"
     ).exists()
 
     assert (
