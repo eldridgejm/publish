@@ -25,18 +25,18 @@ EXAMPLE_5_DIRECTORY = pathlib.Path(__file__).parent / "example_5"
 
 def test_discover_finds_collections():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY)
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
 
     # then
-    assert collections.keys() == {"homeworks", "default"}
+    assert universe.collections.keys() == {"homeworks", "default"}
 
 
 def test_discover_finds_publications():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY)
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
 
     # then
-    assert collections["homeworks"].publications.keys() == {
+    assert universe.collections["homeworks"].publications.keys() == {
         "01-intro",
         "02-python",
     }
@@ -44,48 +44,51 @@ def test_discover_finds_publications():
 
 def test_discover_finds_singletons_and_places_them_in_default_collection():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY)
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
 
     # then
-    assert collections["default"].publications.keys() == {
+    assert universe.collections["default"].publications.keys() == {
         "textbook",
     }
 
 
 def test_discover_reads_publication_metadata():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY)
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
 
     # then
     assert (
-        collections["homeworks"].publications["01-intro"].metadata["name"]
+        universe.collections["homeworks"].publications["01-intro"].metadata["name"]
         == "Homework 01"
     )
 
 
 def test_discover_loads_artifacts():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY)
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
 
     # then
     assert (
-        collections["homeworks"].publications["01-intro"].artifacts["solution"].recipe
+        universe.collections["homeworks"]
+        .publications["01-intro"]
+        .artifacts["solution"]
+        .recipe
         == "touch solution.pdf"
     )
 
 
 def test_discover_loads_dates_as_dates():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY)
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
 
     # then
     assert isinstance(
-        collections["homeworks"].publications["01-intro"].metadata["due"],
+        universe.collections["homeworks"].publications["01-intro"].metadata["due"],
         datetime.datetime,
     )
 
     assert isinstance(
-        collections["homeworks"].publications["01-intro"].metadata["released"],
+        universe.collections["homeworks"].publications["01-intro"].metadata["released"],
         datetime.date,
     )
 
@@ -108,26 +111,32 @@ def test_dicover_raises_when_nested_collections_discovered():
 
 def test_discover_uses_relative_paths_as_keys():
     # when
-    collections = publish.discover(EXAMPLE_5_DIRECTORY)
+    universe = publish.discover(EXAMPLE_5_DIRECTORY)
 
     # then
-    assert "foo/bar" in collections
-    assert "baz/bazinga" in collections["foo/bar"].publications
+    assert "foo/bar" in universe.collections
+    assert "baz/bazinga" in universe.collections["foo/bar"].publications
 
 
 def test_discover_skip_directories():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY, skip_directories={"textbook"})
+    universe = publish.discover(EXAMPLE_1_DIRECTORY, skip_directories={"textbook"})
 
     # then
-    assert "textbook" not in collections['default']
+    assert "textbook" not in universe.collections["default"]
 
 
 def test_discover_filter_artifacts():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY)
-    collections = publish.filter_artifacts(collections, 'solution')
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
+    universe = publish.filter_artifacts(universe, "solution")
 
     # then
-    assert 'homework' not in collections['homeworks'].publications['01-intro'].artifacts
-    assert 'solution' in collections['homeworks'].publications['01-intro'].artifacts
+    assert (
+        "homework"
+        not in universe.collections["homeworks"].publications["01-intro"].artifacts
+    )
+    assert (
+        "solution"
+        in universe.collections["homeworks"].publications["01-intro"].artifacts
+    )

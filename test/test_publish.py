@@ -24,11 +24,11 @@ def outdir(tmpdir):
 
 def test_publish(example_1, outdir):
     # given
-    collection = publish.discover(example_1)
-    built_collections = publish.build(collection)
+    discovered = publish.discover(example_1)
+    builts = publish.build(discovered)
 
     # when
-    published_collections = publish.publish(built_collections, outdir)
+    published = publish.publish(builts, outdir)
 
     # then
     assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
@@ -36,20 +36,22 @@ def test_publish(example_1, outdir):
 
     assert (
         "homework"
-        in published_collections["homeworks"].publications["01-intro"].artifacts
+        in published.collections["homeworks"]
+        .publications["01-intro"]
+        .artifacts
     )
 
 
 def test_only_publish_if_released(example_1, outdir):
     # given
-    collection = publish.discover(example_1)
-    built_collections = publish.build(collection)
-    publication = built_collections["homeworks"].publications["02-python"]
+    discovered = publish.discover(example_1)
+    built = publish.build(discovered)
+    publication = built.collections["homeworks"].publications["02-python"]
     new = publication.artifacts["solution"]._replace(is_released=False)
     publication.artifacts["solution"] = new
 
     # when
-    published_collections = publish.publish(built_collections, outdir)
+    published = publish.publish(built, outdir)
 
     # then
     assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
@@ -57,5 +59,7 @@ def test_only_publish_if_released(example_1, outdir):
 
     assert (
         "solution"
-        not in published_collections["homeworks"].publications["02-python"].artifacts
+        not in published.collections["homeworks"]
+        .publications["02-python"]
+        .artifacts
     )

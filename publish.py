@@ -237,6 +237,12 @@ class Collection(typing.NamedTuple):
         }
 
 
+class Universe(typing.NamedTuple):
+    """Container of all collections."""
+
+    collections: typing.Mapping[str, Collection]
+
+
 class Schema(typing.NamedTuple):
     """Rules governing publications.
 
@@ -689,7 +695,7 @@ def discover(
         initial_node, make_collection, make_publication, skip_directories, callbacks
     )
 
-    return collections
+    return Universe(collections)
 
 
 # filter_artifacts()
@@ -704,7 +710,9 @@ class FilterCallbacks:
         """On an artifact miss."""
 
 
-def filter_artifacts(collections, predicate, callbacks=FilterCallbacks()):
+def filter_artifacts(universe, predicate, callbacks=FilterCallbacks()):
+
+    collections = universe.collections
 
     if isinstance(predicate, str):
         pattern = predicate
@@ -742,7 +750,7 @@ def filter_artifacts(collections, predicate, callbacks=FilterCallbacks()):
         if match.artifact_key not in publication.artifacts:
             publication.artifacts[match.artifact_key] = match.artifact
 
-    return remaining
+    return Universe(remaining)
 
 
 # building
@@ -858,14 +866,14 @@ def build_collection(
     return collection._replace(publications=outputs)
 
 
-def build(collections, ignore_release_time=False, callbacks=BuildCallbacks()):
+def build(universe, ignore_release_time=False, callbacks=BuildCallbacks()):
     outputs = {}
-    for collection_key, collection in collections.items():
+    for collection_key, collection in universe.collections.items():
         callbacks.on_collection(collection_key, collection)
         outputs[collection_key] = build_collection(
             collection, ignore_release_time=ignore_release_time, callbacks=callbacks
         )
-    return outputs
+    return Universe(outputs)
 
 
 def _build(parent):
@@ -898,7 +906,7 @@ def _replace_children(parent, new_children):
 # --------------------------------------------------------------------------------------
 
 
-def publish(collections, outdir):
+def publish(universe, outdir):
     """Copy all of the build results to a destination directory.
 
     An artifact's destination is determined using the following "formula":
@@ -909,6 +917,7 @@ def publish(collections, outdir):
     path may be of an arbitrary depth.
 
     """
+    collections = universe.collections
     published_collections = copy.deepcopy(collections)
     unreleased = set()
 
@@ -936,7 +945,7 @@ def publish(collections, outdir):
         publication = collection.publications[publication_key]
         del publication.artifacts[artifact_key]
 
-    return published_collections
+    return Universe(published_collections)
 
 
 # serialization

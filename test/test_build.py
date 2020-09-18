@@ -20,8 +20,8 @@ def example_1(tmpdir):
 
 def test_build_artifact_integration(example_1):
     # given
-    collections = publish.discover(example_1)
-    artifact = collections["homeworks"].publications["01-intro"].artifacts["solution"]
+    universe = publish.discover(example_1)
+    artifact = universe.collections["homeworks"].publications["01-intro"].artifacts["solution"]
 
     # when
     result = publish.build_artifact(artifact)
@@ -123,24 +123,24 @@ def test_build_artifact_raises_if_no_file():
 
 def test_build_collection(example_1):
     # given
-    collections = publish.discover(example_1)
+    universe = publish.discover(example_1)
 
     # when
-    built_collection = publish.build(collections)
+    built_universe = publish.build(universe)
 
     # then
     assert (example_1 / "homeworks" / "01-intro" / "solution.pdf").exists()
     build_result = (
-        built_collection["homeworks"].publications["01-intro"].artifacts["solution"]
+        built_universe.collections["homeworks"].publications["01-intro"].artifacts["solution"]
     )
     assert build_result.is_released
     assert (
-        built_collection["homeworks"]
+        built_universe.collections["homeworks"]
         .publications["01-intro"]
         .artifacts["solution"]
         .is_released
     )
 
     # check that a deep copy is made
-    del collections["homeworks"]
-    assert "homeworks" in built_collection
+    del universe.collections["homeworks"]
+    assert "homeworks" in built_universe.collections
