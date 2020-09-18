@@ -212,16 +212,10 @@ class Publication(typing.NamedTuple):
 
     def _deep_asdict(self):
         """A dictionary representation of the publication and its children."""
-        metadata = self.metadata
-        artifacts = {}
-
-        for k, a in self.artifacts.items():
-            try:
-                artifacts[k] = a._asdict()
-            except AttributeError:
-                artifacts[k] = str(a)
-
-        return {"metadata": metadata, "artifacts": artifacts}
+        return {
+            "metadata": self.metadata,
+            "artifacts": {k: a._asdict() for (k, a) in self.artifacts.items()},
+        }
 
 
 class Collection(typing.NamedTuple):
@@ -934,7 +928,7 @@ def publish(collections, outdir):
         shutil.copy(full_src, full_dst)
 
         # update the result
-        x.publication.artifacts[x.artifact_key] = relative_dst
+        x.publication.artifacts[x.artifact_key] = PublishedArtifact(str(relative_dst))
 
     # remove all unreleased artifacts
     for (collection_key, publication_key, artifact_key) in unreleased:
@@ -989,7 +983,9 @@ def deserialize(s):
         publications = {}
         for publication_key, publication_dct in collection_dct["publications"].items():
             for artifact_key, artifact_path in publication_dct["artifacts"].items():
-                publication_dct["artifacts"][artifact_key] = pathlib.Path(artifact_path)
+                publication_dct["artifacts"][artifact_key] = PublishedArtifact(
+                    **artifact_path
+                )
             publications[publication_key] = Publication(**publication_dct)
         schema = Schema(**collection_dct["schema"])
         dct[collection_key] = Collection(publications=publications, schema=schema)
@@ -1068,7 +1064,11 @@ def cli(argv=None):
             print(_body(f'\tExecuting "{artifact.recipe}"'))
 
         def on_too_soon(self, artifact):
-            print(_warning(f"\tRelease time {artifact.release_time} has not yet been reached. Skipping."))
+            print(
+                _warning(
+                    f"\tRelease time {artifact.release_time} has not yet been reached. Skipping."
+                )
+            )
 
         def on_success(self, output):
             print(_success("\tBuild was successful"))

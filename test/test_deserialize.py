@@ -18,7 +18,7 @@ def test_serialize_deserialize_roundtrip():
             "released": datetime.date(2020, 2, 28),
         },
         artifacts={
-            "homework": pathlib.Path('./foo/bar')
+            "homework": publish.PublishedArtifact('foo/bar')
         },
     )
 
