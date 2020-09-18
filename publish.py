@@ -867,6 +867,31 @@ def build(collections, ignore_release_time=False, callbacks=BuildCallbacks()):
     return outputs
 
 
+def _build(parent):
+    new_children = {}
+    for child_key, child in children(parent):
+        callback(child_key, child)
+        new_children[child_key] = _build(child)
+    return replace_children(parent, outputs)
+
+
+def _children(parent):
+    if isinstance(parent, dict):
+        return parent.items()
+    elif isinstance(parent, Collection):
+        return parent.publications.items()
+    elif isinstance(parent, Publication):
+        return parent.artifacts.items()
+
+
+def _replace_children(parent, new_children):
+    if isinstance(parent, dict):
+        return new_children
+    elif isinstance(parent, Collection):
+        return parent._replace(publications=new_children)
+    elif isinstance(parent, Publication):
+        return parent._replace(artifacts=new_children)
+
 
 # publishing
 # --------------------------------------------------------------------------------------
