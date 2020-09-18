@@ -162,7 +162,7 @@ class BuildError(Error):
 # --------------------------------------------------------------------------------------
 
 
-class ArtifactInputs(typing.NamedTuple):
+class UnbuiltArtifact(typing.NamedTuple):
     """The inputs needed to build an artifact."""
 
     # the working directory used to build the artifact
@@ -178,7 +178,7 @@ class ArtifactInputs(typing.NamedTuple):
     release_time: datetime.datetime = None
 
 
-class ArtifactOutputs(typing.NamedTuple):
+class BuiltArtifact(typing.NamedTuple):
     """The results of building an artifact."""
 
     # the working directory used to build the artifact
@@ -194,6 +194,13 @@ class ArtifactOutputs(typing.NamedTuple):
     proc: subprocess.CompletedProcess
 
 
+class PublishedArtifact(typing.NamedTuple):
+    """A published artifact."""
+
+    # the path to the file relative to the publication root
+    file: str
+
+
 class Publication(typing.NamedTuple):
     """A publication."""
 
@@ -201,7 +208,7 @@ class Publication(typing.NamedTuple):
     metadata: typing.Mapping[str, typing.Any]
 
     # a dictionary of artifacts
-    artifacts: typing.Mapping[str, ArtifactInputs]
+    artifacts: typing.Mapping[str, UnbuiltArtifact]
 
     def _deep_asdict(self):
         """A dictionary representation of the publication and its children."""
@@ -541,7 +548,7 @@ def read_publication_file(path):
             )
         except ValueError as exc:
             raise InvalidFileError(str(exc), path)
-        artifacts[key] = ArtifactInputs(workdir=path.parent.absolute(), **definition)
+        artifacts[key] = UnbuiltArtifact(workdir=path.parent.absolute(), **definition)
 
     return Publication(metadata=metadata, artifacts=artifacts)
 
@@ -791,11 +798,11 @@ def build_artifact(
 
     Returns
     -------
-    ArtifactOutputs
+    BuiltArtifact
         A summary of the build results.
 
     """
-    output = ArtifactOutputs(
+    output = BuiltArtifact(
         workdir=artifact.workdir, file=artifact.file, is_released=False, proc=None
     )
 

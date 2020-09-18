@@ -10,7 +10,7 @@ def test_collection_as_dict():
     collection.publications["01-intro"] = publish.Publication(
         metadata={"name": "testing"},
         artifacts={
-            "homework": publish.ArtifactInputs(
+            "homework": publish.UnbuiltArtifact(
                 workdir=None, file="homework.pdf", recipe="make", release_time=None
             ),
         },

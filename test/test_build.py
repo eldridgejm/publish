@@ -35,7 +35,7 @@ def test_build_artifact_integration(example_1):
 
 def test_build_artifact_when_release_time_is_in_future():
     # given
-    artifact = publish.ArtifactInputs(
+    artifact = publish.UnbuiltArtifact(
         workdir=pathlib.Path.cwd(),
         file="foo.pdf",
         recipe="echo hi",
@@ -57,7 +57,7 @@ def test_build_artifact_when_release_time_is_in_future():
 
 def test_build_artifact_when_release_time_is_in_future_ignore_release_time():
     # given
-    artifact = publish.ArtifactInputs(
+    artifact = publish.UnbuiltArtifact(
         workdir=pathlib.Path.cwd(),
         file="foo.pdf",
         recipe="echo hi",
@@ -82,7 +82,7 @@ def test_build_artifact_when_release_time_is_in_future_ignore_release_time():
 
 def test_build_artifact_when_recipe_is_none():
     # given
-    artifact = publish.ArtifactInputs(workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None)
+    artifact = publish.UnbuiltArtifact(workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None)
 
     run = Mock()
     exists = Mock(return_value=True)
@@ -97,7 +97,7 @@ def test_build_artifact_when_recipe_is_none():
 
 def test_build_artifact_when_recipe_is_none_raises_if_no_file():
     # given
-    artifact = publish.ArtifactInputs(workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None)
+    artifact = publish.UnbuiltArtifact(workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None)
 
     run = Mock()
     exists = Mock(return_value=False)
@@ -109,7 +109,7 @@ def test_build_artifact_when_recipe_is_none_raises_if_no_file():
 
 def test_build_artifact_raises_if_no_file():
     # given
-    artifact = publish.ArtifactInputs(
+    artifact = publish.UnbuiltArtifact(
         workdir=pathlib.Path.cwd(), file="foo.pdf", recipe="touch bar"
     )
 
