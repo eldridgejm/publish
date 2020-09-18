@@ -115,9 +115,19 @@ def test_discover_uses_relative_paths_as_keys():
     assert "baz/bazinga" in collections["foo/bar"].publications
 
 
-def test_discover_ignore_directories():
+def test_discover_skip_directories():
     # when
-    collections = publish.discover(EXAMPLE_1_DIRECTORY, ignore={"textbook"})
+    collections = publish.discover(EXAMPLE_1_DIRECTORY, skip_directories={"textbook"})
 
     # then
-    assert "textbook" not in collections
+    assert "textbook" not in collections['default']
+
+
+def test_discover_filter_artifacts():
+    # when
+    collections = publish.discover(EXAMPLE_1_DIRECTORY)
+    collections = publish.filter_artifacts(collections, 'solution')
+
+    # then
+    assert 'homework' not in collections['homeworks'].publications['01-intro'].artifacts
+    assert 'solution' in collections['homeworks'].publications['01-intro'].artifacts
