@@ -27,7 +27,7 @@ problem set, the PDF of the solutions, and a .zip containing the homework's
 data.
 
 Artifacts may be given release times before which they should not be built or
-published.  The core job of this package is to discover, build, and publish all
+published. The core job of this package is to discover, build, and publish all
 artifacts whose release time has passed.
 
 
@@ -198,7 +198,7 @@ class PublishedArtifact(typing.NamedTuple):
     """A published artifact."""
 
     # the path to the file relative to the publication root
-    file: str
+    path: str
 
 
 class Publication(typing.NamedTuple):
@@ -335,46 +335,6 @@ def validate(publication, against):
 
     if extra and not schema.allow_unspecified_artifacts:
         raise SchemaError(f"Unknown artifacts provided: {provided - optional}.")
-
-
-# utilities
-# --------------------------------------------------------------------------------------
-
-
-def _all_publications(collections):
-    PublicationLocation = namedtuple(
-        "PublicationLocation",
-        ["collection_key", "collection", "publication_key", "publication"],
-    )
-    for collection_key, collection in collections.items():
-        for publication_key, publication in collection.publications.items():
-            yield PublicationLocation(
-                collection_key, collection, publication_key, publication,
-            )
-
-
-def _all_artifacts(collections):
-    ArtifactLocation = namedtuple(
-        "ArtifactLocation",
-        [
-            "collection_key",
-            "collection",
-            "publication_key",
-            "publication",
-            "artifact_key",
-            "artifact",
-        ],
-    )
-    for x in _all_publications(collections):
-        for artifact_key, artifact in x.publication.artifacts.items():
-            yield ArtifactLocation(
-                x.collection_key,
-                x.collection,
-                x.publication_key,
-                x.publication,
-                artifact_key,
-                artifact,
-            )
 
 
 # discovery
@@ -731,47 +691,22 @@ class FilterCallbacks:
         """On an artifact miss."""
 
 
-def filter_artifacts(universe, predicate, callbacks=FilterCallbacks()):
-
-    collections = universe.collections
+def filter_artifacts(parent, predicate):
 
     if isinstance(predicate, str):
         pattern = predicate
+        def predicate(k, v): return k == pattern
 
-        def predicate(x):
-            return x == pattern
+    if isinstance(parent, Publication):
+        new_children = {k: v for (k, v) in parent._children.items() if predicate(k,v)}
+        return parent._replace_children(new_children)
 
-    # find all artifacts matching the filter
-    matched = []
-    for x in _all_artifacts(collections):
-        if predicate(x.artifact_key):
-            matched.append(x)
-            callbacks.on_hit(x)
-        else:
-            callbacks.on_miss(x)
-
-    remaining = {}
-
-    for match in matched:
-        # if the collection doesn't exist, create it
-        if match.collection_key not in remaining:
-            collection = match.collection._replace(publications={})
-            remaining[match.collection_key] = collection
-        else:
-            collection = remaining[match.collection_key]
-
-        # if the publication doesn't exist, create it
-        if match.publication_key not in collection.publications:
-            publication = match.publication._replace(artifacts={})
-            collection.publications[match.publication_key] = publication
-        else:
-            publication = collection.publications[match.publication_key]
-
-        # add the artifact
-        if match.artifact_key not in publication.artifacts:
-            publication.artifacts[match.artifact_key] = match.artifact
-
-    return Universe(remaining)
+    new_children = {}
+    for child_key, child in parent._children.items():
+        new_child = filter_artifacts(child, predicate)
+        if new_child._children:
+            new_children[child_key] = new_child
+    return parent._replace_children(new_children)
 
 
 # building
@@ -841,18 +776,18 @@ def _build_artifact(
         proc = None
     else:
         callbacks.on_build(artifact)
-        proc = run(
-            artifact.recipe,
-            shell=True,
-            cwd=artifact.workdir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+
+        kwargs = {
+            "cwd": artifact.workdir,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+        }
+        proc = run(artifact.recipe, shell=True, **kwargs)
 
         if proc.returncode:
-            raise BuildError(
-                f"There was a problem while building the artifact: \n{proc.stderr.decode()}"
-            )
+            msg = "There was a problem while building the artifact: "
+            msg += "\n{proc.stderr.decode()}"
+            raise BuildError(msg)
 
     filepath = artifact.workdir / artifact.file
     if not exists(filepath):
@@ -893,46 +828,32 @@ def build(
 # --------------------------------------------------------------------------------------
 
 
-def publish(universe, outdir):
-    """Copy all of the build results to a destination directory.
+def _publish_artifact(built_artifact, outdir, prefix=''):
 
-    An artifact's destination is determined using the following "formula":
+    if not built_artifact.is_released:
+        return PublishedArtifact(None)
 
-        <collection_key>/<publication_key>/artifact.file
+    # actually copy the artifact
+    full_dst = outdir / prefix / built_artifact.file
+    full_dst.parent.mkdir(parents=True, exist_ok=True)
+    full_src = built_artifact.workdir / built_artifact.file
+    shutil.copy(full_src, full_dst)
 
-    Since the collection key and publication key can contain slashes, the
-    path may be of an arbitrary depth.
+    return PublishedArtifact(path=full_dst.relative_to(outdir))
 
-    """
-    collections = universe.collections
-    published_collections = copy.deepcopy(collections)
-    unreleased = set()
 
-    for x in _all_artifacts(published_collections):
-        # if it wasn't released, we shouldn't publish it
-        if not x.artifact.is_released:
-            unreleased.add((x.collection_key, x.publication_key, x.artifact_key))
-            continue
+def publish(parent, outdir, prefix=''):
+    if isinstance(parent, BuiltArtifact):
+        return _publish_artifact(parent, outdir, prefix)
 
-        # actually copy the artifact
-        relative_dst = (
-            pathlib.Path(x.collection_key) / x.publication_key / x.artifact.file
-        )
-        full_dst = outdir / relative_dst
-        full_dst.parent.mkdir(parents=True, exist_ok=True)
-        full_src = x.artifact.workdir / x.artifact.file
-        shutil.copy(full_src, full_dst)
+    new_children = {}
+    for child_key, child in  parent._children.items():
+        new_prefix = pathlib.Path(prefix) / child_key
+        new_children[child_key] = publish(child, outdir, new_prefix)
+    new_parent = parent._replace_children(new_children)
 
-        # update the result
-        x.publication.artifacts[x.artifact_key] = PublishedArtifact(str(relative_dst))
+    return filter_artifacts(new_parent, lambda k, v: v.path is not None)
 
-    # remove all unreleased artifacts
-    for (collection_key, publication_key, artifact_key) in unreleased:
-        collection = published_collections[collection_key]
-        publication = collection.publications[publication_key]
-        del publication.artifacts[artifact_key]
-
-    return Universe(published_collections)
 
 
 # serialization
