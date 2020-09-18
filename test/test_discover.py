@@ -143,7 +143,15 @@ def test_discover_without_file_uses_key():
 def test_discover_filter_artifacts():
     # when
     universe = publish.discover(EXAMPLE_1_DIRECTORY)
-    universe = publish.filter_artifacts(universe, "solution.pdf")
+
+    def keep(k, v):
+        if not isinstance(v, publish.UnbuiltArtifact):
+            return True
+
+        return k == 'solution.pdf'
+
+
+    universe = publish.filter_nodes(universe, keep)
 
     # then
     assert (

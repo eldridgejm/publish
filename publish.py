@@ -263,6 +263,14 @@ class Universe(typing.NamedTuple):
     def _replace_children(self, new_children):
         return self._replace(collections=new_children)
 
+    def _deep_asdict(self):
+        """A dictionary representation of the universe and its children."""
+        return {
+            "collections": {
+                k: p._deep_asdict() for (k, p) in self.collections.items()
+            },
+        }
+
 
 class Schema(typing.NamedTuple):
     """Rules governing publications.
@@ -696,22 +704,24 @@ class FilterCallbacks:
         """On an artifact miss."""
 
 
-def filter_artifacts(parent, predicate):
+def filter_nodes(parent, predicate, callbacks=None):
+    # bottom up -- by the time the predicate is applied to publication, its artifacts
+    # have been filtered
 
-    if isinstance(predicate, str):
-        pattern = predicate
-        def predicate(k, v): return k == pattern
-
-    if isinstance(parent, Publication):
-        new_children = {k: v for (k, v) in parent._children.items() if predicate(k,v)}
-        return parent._replace_children(new_children)
+    if isinstance(parent, (UnbuiltArtifact, BuiltArtifact, PublishedArtifact)):
+        return parent
 
     new_children = {}
     for child_key, child in parent._children.items():
-        new_child = filter_artifacts(child, predicate)
-        if new_child._children:
+        new_child = filter_nodes(child, predicate)
+        is_artifact = isinstance(new_child, (UnbuiltArtifact, BuiltArtifact, PublishedArtifact))
+        if is_artifact or new_child._children:
             new_children[child_key] = new_child
+
+    new_children = {k: v for (k, v) in new_children.items() if predicate(k,v)}
+    
     return parent._replace_children(new_children)
+
 
 
 # building
@@ -857,7 +867,13 @@ def publish(parent, outdir, prefix=''):
         new_children[child_key] = publish(child, outdir, new_prefix)
     new_parent = parent._replace_children(new_children)
 
-    return filter_artifacts(new_parent, lambda k, v: v.path is not None)
+    def keep_non_null_artifacts(k, v):
+        if not isinstance(v, BuiltArtifact):
+            return True
+        else:
+            return v.path is not None
+
+    return filter_nodes(new_parent, keep_non_null_artifacts)
 
 
 
@@ -1011,8 +1027,15 @@ def cli(argv=None):
     )
 
     if args.artifact_filter is not None:
-        discovered = filter_artifacts(
-            discovered, args.artifact_filter, callbacks=CLIFilterCallbacks()
+
+        def keep(k, v):
+            if not isinstance(v, UnbuiltArtifact):
+                return True
+            else:
+                return k == args.artifact_filter
+
+        discovered = filter_nodes(
+            discovered, keep, callbacks=CLIFilterCallbacks()
         )
 
     built = build(
