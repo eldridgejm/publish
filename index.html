@@ -1,0 +1,1178 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>publish &mdash; publish  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="#" class="icon icon-home" alt="Documentation Home"> publish
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">publish</a><ul>
+<li><a class="reference internal" href="#terminology">Terminology</a></li>
+<li><a class="reference internal" href="#discovering-building-and-publishing">Discovering, Building, and Publishing</a><ul>
+<li><a class="reference internal" href="#discovery">Discovery</a></li>
+<li><a class="reference internal" href="#building">Building</a></li>
+<li><a class="reference internal" href="#publishing">Publishing</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#api">API</a><ul>
+<li><a class="reference internal" href="#types">Types</a></li>
+<li><a class="reference internal" href="#schemas-and-validation">Schemas and Validation</a></li>
+<li><a class="reference internal" href="#id1">Discovery</a></li>
+<li><a class="reference internal" href="#build">Build</a></li>
+<li><a class="reference internal" href="#id2">Publish</a></li>
+<li><a class="reference internal" href="#serializtion">Serializtion</a></li>
+<li><a class="reference internal" href="#filtering">Filtering</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+</div>
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">publish</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>publish</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <span class="target" id="module-publish"></span><div class="section" id="publish">
+<h1>publish<a class="headerlink" href="#publish" title="Permalink to this headline">¶</a></h1>
+<p>A tool to build and publish certain artifacts at certain times.</p>
+<p><cite>publish</cite> was desgined specifically for the automatic publication of course
+materials, such as homeworks, lecture slides, etc.</p>
+<div class="section" id="terminology">
+<h2>Terminology<a class="headerlink" href="#terminology" title="Permalink to this headline">¶</a></h2>
+<p>An <strong>artifact</strong> is a file – usually one that is generated by some build process.</p>
+<p>A <strong>publication</strong> is a coherent group of one or more artifacts and their metadata.</p>
+<p>A <strong>collection</strong> is a group of publications which all satisfy the same <strong>schema</strong>.</p>
+<p>A <strong>schema</strong> is a set of constraints on a publication’s artifacts and metadata.</p>
+<p>This establishes a <strong>collection -&gt; publication -&gt; artifact hierarchy</strong>: each
+artifact belongs to exactly one publication, and each publication belongs to
+exactly one collection.</p>
+<p>An example of such a hierarchy is the following: all homeworks in a course form
+a collection. Each publication within the collection is an individual
+homework. Each publication may have several artifacts, such as the PDF of the
+problem set, the PDF of the solutions, and a .zip containing the homework’s
+data.</p>
+<p>An artifact may have a <strong>release time</strong>, before which it will not be built or published.</p>
+</div>
+<div class="section" id="discovering-building-and-publishing">
+<h2>Discovering, Building, and Publishing<a class="headerlink" href="#discovering-building-and-publishing" title="Permalink to this headline">¶</a></h2>
+<p>When run as a script, this package follows a three step process of discovering,
+building, and publishing artifacts.</p>
+<p>In the <strong>discovery</strong> step, the script constructs a collection -&gt; publication -&gt;
+artifact hierarchy by recursively searching an input directory for artifacts.</p>
+<p>In the <strong>build</strong> step, the script builds every artifact whose release time has passed.</p>
+<p>In the <strong>publish</strong> step, the script copies every released artifact to an output
+directory.</p>
+<div class="section" id="discovery">
+<h3>Discovery<a class="headerlink" href="#discovery" title="Permalink to this headline">¶</a></h3>
+<p>In the discovery step, the <strong>input directory</strong> is recursively searched for collections,
+publications, and artifacts.</p>
+<p>A collection is defined by creating a file named <code class="docutils literal notranslate"><span class="pre">collections.yaml</span></code> in a directory.
+The contents of the file describe the artifacts and metadata that are required
+of each of the publications within the collection. For instance:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># &lt;input_directory&gt;/homeworks/collection.yaml</span>
+
+<span class="nt">schema</span><span class="p">:</span>
+    <span class="nt">required_artifacts</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">homework.pdf</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">solution.pdf</span>
+
+    <span class="nt">optional_artifacts</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">template.zip</span>
+
+    <span class="nt">metadata_schema</span><span class="p">:</span>
+        <span class="nt">name</span><span class="p">:</span>
+            <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">string</span>
+        <span class="nt">due</span><span class="p">:</span>
+            <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">datetime</span>
+        <span class="nt">released</span><span class="p">:</span>
+            <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">date</span>
+</pre></div>
+</div>
+<p>The file above specifies that publications must have <code class="docutils literal notranslate"><span class="pre">homework.pdf</span></code> and
+<code class="docutils literal notranslate"><span class="pre">solution.pdf</span></code> artifacts, and may or may not have a <code class="docutils literal notranslate"><span class="pre">template.zip</span></code>
+artifact. The publications must also have <em>name</em>, <em>due</em>, and <em>released</em> fields
+in their metadata with the listed types. The metadata specification is given in a form
+recognizable by the <em>cerberus</em> Python package.</p>
+<p>A publication and its artifacts are defined by creating a <code class="docutils literal notranslate"><span class="pre">publish.yaml</span></code> file
+in the directory containing the publication. For instance, the file below
+describes how and when to build two artifacts named <code class="docutils literal notranslate"><span class="pre">homework.pdf</span></code> and <code class="docutils literal notranslate"><span class="pre">solution.pdf</span></code>,
+along with metadata:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># &lt;input_directory&gt;/homeworks/01-intro/publish.yaml</span>
+
+<span class="nt">metadata</span><span class="p">:</span>
+    <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Homework 01</span>
+    <span class="nt">due</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2020-09-04 23:59:00</span>
+    <span class="nt">released</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2020-09-01</span>
+
+<span class="nt">artifacts</span><span class="p">:</span>
+    <span class="nt">homework.pdf</span><span class="p">:</span>
+        <span class="nt">recipe</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">make homework</span>
+    <span class="nt">solution.pdf</span><span class="p">:</span>
+        <span class="nt">file</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">./build/solution.pdf</span>
+        <span class="nt">recipe</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">make solution</span>
+        <span class="nt">release_time</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1 day after metadata.due</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">file</span></code> field tells <em>publish</em> where the file will appear when the recipe
+is run.  is omitted, its value is assumed to be the artifact’s key – for
+instance, <code class="docutils literal notranslate"><span class="pre">homework.pdf</span></code>’s <code class="docutils literal notranslate"><span class="pre">file</span></code> field is simply <code class="docutils literal notranslate"><span class="pre">homework.pdf</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">release_time</span></code> field provides the artifact’s release time. It can be a
+specific datetime in ISO 8601 format, like <code class="docutils literal notranslate"><span class="pre">2020-09-18</span> <span class="pre">17:00:00</span></code>, or a
+<em>relative</em> date of the form “&lt;number&gt; days after metadata.&lt;field&gt;”, in which
+case the date will be calculated relative to the metadata field.  The field it
+refers to must be a datetime.</p>
+<p>The file hierarchy determines which publications belong to which collections.
+If a publication file is placed in a directory that is a descendent of a
+directory containing a collection file, the publication will be placed in that
+collection and its contents will be validated against the collection’s schema.
+Publications which are not under a directory containing a <code class="docutils literal notranslate"><span class="pre">collection.yaml</span></code>
+are placed into a “default” collection with no schema. They may contain any
+number of artifacts and metadata keys.</p>
+<p>Collections, publications, and artifacts all have <strong>keys</strong> which locate them
+within the hierarchy. These keys are inferred from their position in the
+filesystem. For example, a collection file placed at
+<code class="docutils literal notranslate"><span class="pre">&lt;input_directory&gt;/homeworks/collection.yaml</span></code> will create a collection keyed
+“homeworks”. A publication within the collection at
+<code class="docutils literal notranslate"><span class="pre">&lt;input_directory&gt;/homeworks/01-intro/publish.yaml</span></code> will be keyed “01-intro”.
+The keys of the artifacts are simply their keys within the <code class="docutils literal notranslate"><span class="pre">publish.yaml</span></code>
+file.</p>
+</div>
+<div class="section" id="building">
+<h3>Building<a class="headerlink" href="#building" title="Permalink to this headline">¶</a></h3>
+<p>Once all collections, publications, and artifacts have been discovered, the
+script moves to the build phase.</p>
+<p>Artifacts are built by running the command given in the artifact’s <cite>recipe</cite>
+field within the directory containing the artifact’s <code class="docutils literal notranslate"><span class="pre">publication.yaml</span></code> file.
+Different artifacts should have “orthogonal” build processes so that the order
+in which the artifacts are built is inconsequential.</p>
+<p>If an error occurs during any build the entire process is halted and the
+program returns without continuing on to the publish phase. An error is
+considered to occur if the build process returns a nonzero error code, or if
+the artifact file is missing after the recipe is run.</p>
+</div>
+<div class="section" id="publishing">
+<h3>Publishing<a class="headerlink" href="#publishing" title="Permalink to this headline">¶</a></h3>
+<p>In the publish phase, all artifacts whose release date has passed are copied to
+an <strong>output directory</strong>. Additionally, a JSON file containing information about
+the collection -&gt; publication -&gt; artifact hierarchy is placed at the root of
+the output directory.</p>
+<p>Artifacts are copied to a location within the output directory according to the
+following “formula”:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&lt;output_directory&gt;/&lt;collection_key&gt;/&lt;publication_key&gt;/&lt;artifact_key&gt;
+</pre></div>
+</div>
+<p>For instance, an artifact keyed <code class="docutils literal notranslate"><span class="pre">homework.pdf</span></code> in the <code class="docutils literal notranslate"><span class="pre">01-intro</span></code> publication
+of the <code class="docutils literal notranslate"><span class="pre">homeworks</span></code> collection will be copied to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">output_directory</span><span class="o">&gt;/</span><span class="n">homeworks</span><span class="o">/</span><span class="mi">01</span><span class="o">-</span><span class="n">intro</span><span class="o">/</span><span class="n">homework</span><span class="o">.</span><span class="n">pdf</span>
+</pre></div>
+</div>
+<p>An artifact which has not been released will not be copied, even if the
+artifact file exists.</p>
+<p><em>publish</em> will create a JSON file named <code class="docutils literal notranslate"><span class="pre">&lt;output_directory&gt;/published.json</span></code>.
+This file contains nested dictionaries describing the structure of the
+collection -&gt; publication -&gt; artifact hierarchy.</p>
+<p>For example, the below code will load the JSON file and print the path of a published
+artifact relative to the output directory, as well as a publication’s metadata.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">json</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">d</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;published.json&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;collections&#39;</span><span class="p">][</span><span class="s1">&#39;homeworks&#39;</span><span class="p">][</span><span class="s1">&#39;publications&#39;</span><span class="p">][</span><span class="s1">&#39;01-intro&#39;</span><span class="p">][</span><span class="s1">&#39;artifacts&#39;</span><span class="p">][</span><span class="s1">&#39;homework.pdf&#39;</span><span class="p">][</span><span class="s1">&#39;path&#39;</span><span class="p">])</span>
+<span class="go">homeworks/01-intro/homework.pdf</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;collections&#39;</span><span class="p">][</span><span class="s1">&#39;homeworks&#39;</span><span class="p">][</span><span class="s1">&#39;publications&#39;</span><span class="p">][</span><span class="s1">&#39;01-intro&#39;</span><span class="p">][</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;due&#39;</span><span class="p">])</span>
+<span class="go">2020-09-10 23:59:00</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="api">
+<h1>API<a class="headerlink" href="#api" title="Permalink to this headline">¶</a></h1>
+<p><em>publish</em> can also be used as a Python package. Its behavior when run as a
+script can be reproduced using three high-level functions: <a class="reference internal" href="#publish.discover" title="publish.discover"><code class="xref py py-func docutils literal notranslate"><span class="pre">discover()</span></code></a>,
+<a class="reference internal" href="#publish.build" title="publish.build"><code class="xref py py-func docutils literal notranslate"><span class="pre">build()</span></code></a>, and <a class="reference internal" href="#publish.publish" title="publish.publish"><code class="xref py py-func docutils literal notranslate"><span class="pre">publish.publish()</span></code></a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">discovered</span> <span class="o">=</span> <span class="n">publish</span><span class="o">.</span><span class="n">discover</span><span class="p">(</span><span class="s1">&#39;path/to/input_directory&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">built</span> <span class="o">=</span> <span class="n">publish</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">discovered</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">published</span> <span class="o">=</span> <span class="n">publish</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span><span class="n">built</span><span class="p">,</span> <span class="s1">&#39;path/to/output/directory&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>These functions can be used to build and publish individual collections,
+publications, and artifacts as well, as described below.</p>
+<p>The full API of the package is as follows:</p>
+<p><strong>Exceptions</strong></p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">Error</span></code></p></td>
+<td><p>Generic error.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ValidationError</span></code></p></td>
+<td><p>Publication does not satisfy schema.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">DiscoveryError</span></code>(msg, path)</p></td>
+<td><p>A configuration file is not valid.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BuildError</span></code></p></td>
+<td><p>Problem while building the artifact.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Types</strong></p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnbuiltArtifact</span></code></a>(workdir, file, recipe, …)</p></td>
+<td><p>The inputs needed to build an artifact.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>(workdir, file, is_released, …)</p></td>
+<td><p>The results of building an artifact.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.PublishedArtifact" title="publish.PublishedArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PublishedArtifact</span></code></a>(path)</p></td>
+<td><p>A published artifact.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.Publication" title="publish.Publication"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Publication</span></code></a>(metadata, Any], artifacts, …)</p></td>
+<td><p>A publication.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.Collection" title="publish.Collection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Collection</span></code></a>(schema, publications, …)</p></td>
+<td><p>A collection.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.Universe" title="publish.Universe"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Universe</span></code></a>(collections, publish.Collection])</p></td>
+<td><p>Container of all collections.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.Schema" title="publish.Schema"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Schema</span></code></a>(required_artifacts, …)</p></td>
+<td><p>Rules governing publications.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Functions</strong></p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.build" title="publish.build"><code class="xref py py-obj docutils literal notranslate"><span class="pre">build</span></code></a>(parent, *[, ignore_release_time, now, …])</p></td>
+<td><p>Build a universe/collection/publication/artifact.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.deserialize" title="publish.deserialize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">deserialize</span></code></a>(s)</p></td>
+<td><p>Reconstruct a universe/collection/publication/artifact from JSON.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.discover" title="publish.discover"><code class="xref py py-obj docutils literal notranslate"><span class="pre">discover</span></code></a>(input_directory[, …])</p></td>
+<td><p>Discover the collections and publications in the filesystem.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.filter_nodes" title="publish.filter_nodes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_nodes</span></code></a>(parent, predicate[, callbacks])</p></td>
+<td><p>Remove nodes from a Universe/Collection/Publication.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.publish" title="publish.publish"><code class="xref py py-obj docutils literal notranslate"><span class="pre">publish</span></code></a>(parent, outdir[, prefix, callbacks])</p></td>
+<td><p>Publish a universe/collection/publication/artifact by copying it.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.read_collection_file" title="publish.read_collection_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_collection_file</span></code></a>(path)</p></td>
+<td><p>Read a <a class="reference internal" href="#publish.Collection" title="publish.Collection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Collection</span></code></a> from a yaml file.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.read_publication_file" title="publish.read_publication_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_publication_file</span></code></a>(path)</p></td>
+<td><p>Read a <a class="reference internal" href="#publish.Publication" title="publish.Publication"><code class="xref py py-class docutils literal notranslate"><span class="pre">Publication</span></code></a> from a yaml file.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.serialize" title="publish.serialize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">serialize</span></code></a>(node)</p></td>
+<td><p>Serialize the universe/collection/publication/artifact to JSON.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.validate" title="publish.validate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">validate</span></code></a>(publication, against)</p></td>
+<td><p>Make sure that a publication satisfies the schema.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="section" id="types">
+<h2>Types<a class="headerlink" href="#types" title="Permalink to this headline">¶</a></h2>
+<p><em>publish</em> provides several types for representing collections, publications,
+and artifacts.</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnbuiltArtifact</span></code></a>(workdir, file, recipe, …)</p></td>
+<td><p>The inputs needed to build an artifact.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>(workdir, file, is_released, …)</p></td>
+<td><p>The results of building an artifact.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.PublishedArtifact" title="publish.PublishedArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PublishedArtifact</span></code></a>(path)</p></td>
+<td><p>A published artifact.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.Publication" title="publish.Publication"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Publication</span></code></a>(metadata, Any], artifacts, …)</p></td>
+<td><p>A publication.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#publish.Collection" title="publish.Collection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Collection</span></code></a>(schema, publications, …)</p></td>
+<td><p>A collection.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.Universe" title="publish.Universe"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Universe</span></code></a>(collections, publish.Collection])</p></td>
+<td><p>Container of all collections.</p></td>
+</tr>
+</tbody>
+</table>
+<p>There are three artifact types, each used to represent artifacts at different
+stages of the discover -&gt; build -&gt; publish process. Each are subclasses of
+<code class="xref py py-class docutils literal notranslate"><span class="pre">typing.NamedTuple</span></code>.</p>
+<dl class="py class">
+<dt id="publish.UnbuiltArtifact">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">UnbuiltArtifact</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">workdir</span><span class="p">:</span> <span class="n">pathlib.Path</span></em>, <em class="sig-param"><span class="n">file</span><span class="p">:</span> <span class="n">str</span></em>, <em class="sig-param"><span class="n">recipe</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">release_time</span><span class="p">:</span> <span class="n">datetime.datetime</span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.UnbuiltArtifact" title="Permalink to this definition">¶</a></dt>
+<dd><p>The inputs needed to build an artifact.</p>
+<dl class="py attribute">
+<dt id="publish.UnbuiltArtifact.workdir">
+<code class="sig-name descname">workdir</code><a class="headerlink" href="#publish.UnbuiltArtifact.workdir" title="Permalink to this definition">¶</a></dt>
+<dd><p>Absolute path to the working directory used to build the artifact.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>pathlib.Path</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.UnbuiltArtifact.file">
+<code class="sig-name descname">file</code><a class="headerlink" href="#publish.UnbuiltArtifact.file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Path (relative to the workdir) of the file produced by the build.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.UnbuiltArtifact.recipe">
+<code class="sig-name descname">recipe</code><a class="headerlink" href="#publish.UnbuiltArtifact.recipe" title="Permalink to this definition">¶</a></dt>
+<dd><p>Command used to build the artifact. If None, no command is necessary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Union[str, None]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.UnbuiltArtifact.release_time">
+<code class="sig-name descname">release_time</code><a class="headerlink" href="#publish.UnbuiltArtifact.release_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>Time/date the artifact should be made public. If None, it is always available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Union[datetime.datetime, None]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="publish.BuiltArtifact">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">BuiltArtifact</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">workdir</span><span class="p">:</span> <span class="n">pathlib.Path</span></em>, <em class="sig-param"><span class="n">file</span><span class="p">:</span> <span class="n">str</span></em>, <em class="sig-param"><span class="n">is_released</span><span class="p">:</span> <span class="n">bool</span></em>, <em class="sig-param"><span class="n">returncode</span><span class="p">:</span> <span class="n">int</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">stdout</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">stderr</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuiltArtifact" title="Permalink to this definition">¶</a></dt>
+<dd><p>The results of building an artifact.</p>
+<dl class="py attribute">
+<dt id="publish.BuiltArtifact.workdir">
+<code class="sig-name descname">workdir</code><a class="headerlink" href="#publish.BuiltArtifact.workdir" title="Permalink to this definition">¶</a></dt>
+<dd><p>Absolute path to the working directory used to build the artifact.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>pathlib.Path</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.BuiltArtifact.file">
+<code class="sig-name descname">file</code><a class="headerlink" href="#publish.BuiltArtifact.file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Path (relative to the workdir) of the file produced by the build.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.BuiltArtifact.is_released">
+<code class="sig-name descname">is_released</code><a class="headerlink" href="#publish.BuiltArtifact.is_released" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether or not the artifact’s release time has passed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.BuiltArtifact.returncode">
+<code class="sig-name descname">returncode</code><a class="headerlink" href="#publish.BuiltArtifact.returncode" title="Permalink to this definition">¶</a></dt>
+<dd><p>The build process’s return code. If None, there was no process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.BuiltArtifact.stdout">
+<code class="sig-name descname">stdout</code><a class="headerlink" href="#publish.BuiltArtifact.stdout" title="Permalink to this definition">¶</a></dt>
+<dd><p>The build process’s stdout. If None, there was no process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.BuiltArtifact.stderr">
+<code class="sig-name descname">stderr</code><a class="headerlink" href="#publish.BuiltArtifact.stderr" title="Permalink to this definition">¶</a></dt>
+<dd><p>The build process’s stderr. If None, there was no process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="publish.PublishedArtifact">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">PublishedArtifact</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span><span class="p">:</span> <span class="n">str</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.PublishedArtifact" title="Permalink to this definition">¶</a></dt>
+<dd><p>A published artifact.</p>
+<dl class="py attribute">
+<dt id="publish.PublishedArtifact.path">
+<code class="sig-name descname">path</code><a class="headerlink" href="#publish.PublishedArtifact.path" title="Permalink to this definition">¶</a></dt>
+<dd><p>The path to the artifact’s file relative to the output directory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<p>For convenience, all three of these types inherit from an <code class="xref py py-class docutils literal notranslate"><span class="pre">Artifact</span></code>
+base class. This makes it easy to check whether an object is an artifact of
+any kind using <code class="docutils literal notranslate"><span class="pre">isinstance(x,</span> <span class="pre">publish.Artifact)</span></code>.</p>
+<p>Publications and collections are represented with the <a class="reference internal" href="#publish.Publication" title="publish.Publication"><code class="xref py py-class docutils literal notranslate"><span class="pre">Publication</span></code></a> and
+<a class="reference internal" href="#publish.Collection" title="publish.Collection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Collection</span></code></a> types. Furthermore, a set of collections is represented
+with the <a class="reference internal" href="#publish.Universe" title="publish.Universe"><code class="xref py py-class docutils literal notranslate"><span class="pre">Universe</span></code></a> type. These three types all inherit from
+<code class="xref py py-class docutils literal notranslate"><span class="pre">typing.NamedTuple</span></code>.</p>
+<dl class="py class">
+<dt id="publish.Publication">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">Publication</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">metadata</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span>Any<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">artifacts</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span>publish.Artifact<span class="p">]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.Publication" title="Permalink to this definition">¶</a></dt>
+<dd><p>A publication.</p>
+<dl class="py attribute">
+<dt id="publish.Publication.artifacts">
+<code class="sig-name descname">artifacts</code><a class="headerlink" href="#publish.Publication.artifacts" title="Permalink to this definition">¶</a></dt>
+<dd><p>The artifacts contained in the publication.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Dict[str, Artifact]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.Publication.metadata">
+<code class="sig-name descname">metadata</code><a class="headerlink" href="#publish.Publication.metadata" title="Permalink to this definition">¶</a></dt>
+<dd><p>The metadata dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Dict[str, Any]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="publish.Collection">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">Collection</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">schema</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.Schema" title="publish.Schema">Schema</a></span></em>, <em class="sig-param"><span class="n">publications</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span><a class="reference internal" href="#publish.Publication" title="publish.Publication">publish.Publication</a><span class="p">]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.Collection" title="Permalink to this definition">¶</a></dt>
+<dd><p>A collection.</p>
+<dl class="py attribute">
+<dt id="publish.Collection.schema">
+<code class="sig-name descname">schema</code><a class="headerlink" href="#publish.Collection.schema" title="Permalink to this definition">¶</a></dt>
+<dd><p>The schema used to validate the publications within the collection.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#publish.Schema" title="publish.Schema">Schema</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.Collection.publications">
+<code class="sig-name descname">publications</code><a class="headerlink" href="#publish.Collection.publications" title="Permalink to this definition">¶</a></dt>
+<dd><p>The publications contained in the collection.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Dict[str, <a class="reference internal" href="#publish.Publication" title="publish.Publication">Publication</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="publish.Universe">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">Universe</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">collections</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span><a class="reference internal" href="#publish.Collection" title="publish.Collection">publish.Collection</a><span class="p">]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.Universe" title="Permalink to this definition">¶</a></dt>
+<dd><p>Container of all collections.</p>
+<dl class="py attribute">
+<dt id="publish.Universe.collections">
+<code class="sig-name descname">collections</code><a class="headerlink" href="#publish.Universe.collections" title="Permalink to this definition">¶</a></dt>
+<dd><p>The collections.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Dict[str, <a class="reference internal" href="#publish.Collection" title="publish.Collection">Collection</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<p>These types exist within a hierarchy: A <a class="reference internal" href="#publish.Universe" title="publish.Universe"><code class="xref py py-class docutils literal notranslate"><span class="pre">Universe</span></code></a> contains instances of
+<a class="reference internal" href="#publish.Collection" title="publish.Collection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Collection</span></code></a> which contain instances of <a class="reference internal" href="#publish.Publication" title="publish.Publication"><code class="xref py py-class docutils literal notranslate"><span class="pre">Publication</span></code></a> which
+contain instances of <code class="xref py py-class docutils literal notranslate"><span class="pre">Artifact</span></code>. <a class="reference internal" href="#publish.Universe" title="publish.Universe"><code class="xref py py-class docutils literal notranslate"><span class="pre">Universe</span></code></a>, <a class="reference internal" href="#publish.Collection" title="publish.Collection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Collection</span></code></a>,
+and <a class="reference internal" href="#publish.Publication" title="publish.Publication"><code class="xref py py-class docutils literal notranslate"><span class="pre">Publication</span></code></a> are <em>internal nodes</em> of the hierarchy, while
+<code class="xref py py-class docutils literal notranslate"><span class="pre">Artifact</span></code> instances are leaf nodes.</p>
+<p>Internal node types share several methods and attributes, almost as if they
+were inherited from a parent “InternalNode” base class (which doesn’t exist in
+actuality):</p>
+<dl class="py class">
+<dt id="publish.InternalNode">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">InternalNode</code><a class="headerlink" href="#publish.InternalNode" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt id="publish.InternalNode._deep_asdict">
+<code class="sig-name descname">_deep_asdict</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">self</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.InternalNode._deep_asdict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recursively compute a dictionary representation of the object.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.InternalNode._replace_children">
+<code class="sig-name descname">_replace_children</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">self</span></em>, <em class="sig-param"><span class="n">new_children</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.InternalNode._replace_children" title="Permalink to this definition">¶</a></dt>
+<dd><p>Replace the node’s children with a new set of children.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.InternalNode._children">
+<code class="sig-name descname">_children</code><a class="headerlink" href="#publish.InternalNode._children" title="Permalink to this definition">¶</a></dt>
+<dd><p>The node’s children.</p>
+</dd></dl>
+
+</dd></dl>
+
+<p>For instance, the <code class="docutils literal notranslate"><span class="pre">._children</span></code> attribute of a <a class="reference internal" href="#publish.Collection" title="publish.Collection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Collection</span></code></a> returns a
+dictionary mapping publication keys to <a class="reference internal" href="#publish.Publication" title="publish.Publication"><code class="xref py py-class docutils literal notranslate"><span class="pre">Publication</span></code></a> instances.</p>
+</div>
+<div class="section" id="schemas-and-validation">
+<h2>Schemas and Validation<a class="headerlink" href="#schemas-and-validation" title="Permalink to this headline">¶</a></h2>
+<p>Schemas used to validate publications are represented with the <a class="reference internal" href="#publish.Schema" title="publish.Schema"><code class="xref py py-class docutils literal notranslate"><span class="pre">Schema</span></code></a> class.</p>
+<dl class="py class">
+<dt id="publish.Schema">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">Schema</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">required_artifacts</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.Collection" title="publish.Collection">Collection</a><span class="p">[</span>str<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">optional_artifacts</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.Collection" title="publish.Collection">Collection</a><span class="p">[</span>str<span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">metadata_schema</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span>Mapping<span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">allow_unspecified_artifacts</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.Schema" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rules governing publications.</p>
+<dl class="py attribute">
+<dt id="publish.Schema.required_artifacts">
+<code class="sig-name descname">required_artifacts</code><a class="headerlink" href="#publish.Schema.required_artifacts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Names of artifacts that publications must contain.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>typing.Collection[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.Schema.optional_artifacts">
+<code class="sig-name descname">optional_artifacts</code><a class="headerlink" href="#publish.Schema.optional_artifacts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Names of artifacts that publication are permitted to contain. Default: empty
+list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>typing.Collection[str], optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.Schema.allow_unspecified_artifacts">
+<code class="sig-name descname">allow_unspecified_artifacts</code><a class="headerlink" href="#publish.Schema.allow_unspecified_artifacts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Is it permissible for a publication to have unknown artifacts? Default: False.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool, optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.Schema.metadata_schema">
+<code class="sig-name descname">metadata_schema</code><a class="headerlink" href="#publish.Schema.metadata_schema" title="Permalink to this definition">¶</a></dt>
+<dd><p>A dictionary describing a schema used to validate publication metadata. In the
+style of cerberus. If None, no validation will be performed. Default: None.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Mapping[str, Any], optional</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<p>Validation is performed with the following function:</p>
+<dl class="py function">
+<dt id="publish.validate">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">validate</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">publication</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.Publication" title="publish.Publication">publish.Publication</a></span></em>, <em class="sig-param"><span class="n">against</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.Schema" title="publish.Schema">publish.Schema</a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.validate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make sure that a publication satisfies the schema.</p>
+<p>This checks the publication’s metadata dictionary against
+<code class="docutils literal notranslate"><span class="pre">against.metadata_schema</span></code>. Verifies that all required artifacts are
+provided, and that no unknown artifacts are given (unless
+<code class="docutils literal notranslate"><span class="pre">schema.allow_unspecified_artifacts</span> <span class="pre">==</span> <span class="pre">True</span></code>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>publication</strong> (<a class="reference internal" href="#publish.Publication" title="publish.Publication"><em>Publication</em></a>) – A fully-specified publication.</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>ValidationError</strong> – If the publication does not satisfy the schema’s constraints.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<div class="toctree-wrapper compound">
+</div>
+</div>
+<div class="section" id="id1">
+<h2>Discovery<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>The discovery of collections, publications, and artifacts is performed using the
+<a class="reference internal" href="#publish.discover" title="publish.discover"><code class="xref py py-func docutils literal notranslate"><span class="pre">discover()</span></code></a> function.</p>
+<dl class="py function">
+<dt id="publish.discover">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">discover</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">input_directory</span><span class="p">:</span> <span class="n">pathlib.Path</span></em>, <em class="sig-param"><span class="n">skip_directories</span><span class="p">:</span> <span class="n">Optional<span class="p">[</span><a class="reference internal" href="#publish.Collection" title="publish.Collection">Collection</a><span class="p">[</span>str<span class="p">]</span><span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">callbacks</span><span class="p">:</span> <span class="n">Optional<span class="p">[</span><a class="reference internal" href="#publish.DiscoverCallbacks" title="publish.DiscoverCallbacks">publish.DiscoverCallbacks</a><span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span> &#x2192; <a class="reference internal" href="#publish.Universe" title="publish.Universe">publish.Universe</a><a class="headerlink" href="#publish.discover" title="Permalink to this definition">¶</a></dt>
+<dd><p>Discover the collections and publications in the filesystem.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_directory</strong> – The path to the directory that will be recursively searched.</p></li>
+<li><p><strong>skip_directories</strong> – A collection of directory names that should be skipped if discovered.
+If None, no directories will be skipped.</p></li>
+<li><p><strong>callbacks</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="#publish.DiscoverCallbacks" title="publish.DiscoverCallbacks"><em>DiscoverCallbacks</em></a><em>]</em>) – Callbacks to be invoked during the discovery. If omitted, no callbacks
+are executed. See <a class="reference internal" href="#publish.DiscoverCallbacks" title="publish.DiscoverCallbacks"><code class="xref py py-class docutils literal notranslate"><span class="pre">DiscoverCallbacks</span></code></a> for the possible callbacks
+and their arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The collections and the nested publications and artifacts, contained in
+a <a class="reference internal" href="#publish.Universe" title="publish.Universe"><code class="xref py py-class docutils literal notranslate"><span class="pre">Universe</span></code></a> instance.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#publish.Universe" title="publish.Universe">Universe</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<p>Callbacks are invoked at certain points during the discovery. To provide
+callbacks to the function, subclass and override the desired members of the
+below class, and provide an instance to <a class="reference internal" href="#publish.discover" title="publish.discover"><code class="xref py py-func docutils literal notranslate"><span class="pre">discover()</span></code></a>.</p>
+<dl class="py class">
+<dt id="publish.DiscoverCallbacks">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">DiscoverCallbacks</code><a class="headerlink" href="#publish.DiscoverCallbacks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Callbacks used in <a class="reference internal" href="#publish.discover" title="publish.discover"><code class="xref py py-func docutils literal notranslate"><span class="pre">discover()</span></code></a>. Defaults do nothing.</p>
+<dl class="py method">
+<dt id="publish.DiscoverCallbacks.on_collection">
+<code class="sig-name descname">on_collection</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.DiscoverCallbacks.on_collection" title="Permalink to this definition">¶</a></dt>
+<dd><p>When a collection is discovered.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>pathlib.Path</em>) – The path of the collection file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.DiscoverCallbacks.on_publication">
+<code class="sig-name descname">on_publication</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.DiscoverCallbacks.on_publication" title="Permalink to this definition">¶</a></dt>
+<dd><p>When a publication is discovered.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>pathlib.Path</em>) – The path of the publication file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.DiscoverCallbacks.on_skip">
+<code class="sig-name descname">on_skip</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.DiscoverCallbacks.on_skip" title="Permalink to this definition">¶</a></dt>
+<dd><p>When a directory is skipped.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>pathlib.Path</em>) – The path of the directory to be skipped.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<p>Two low-level functions <a class="reference internal" href="#publish.read_collection_file" title="publish.read_collection_file"><code class="xref py py-func docutils literal notranslate"><span class="pre">read_collection_file()</span></code></a> and
+<a class="reference internal" href="#publish.read_publication_file" title="publish.read_publication_file"><code class="xref py py-func docutils literal notranslate"><span class="pre">read_publication_file()</span></code></a> are also available for reading individual
+collection and publication files. Note that they are not recursive: reading a
+collection file does not load any publications into the collection. Most of the
+time, you probably want <a class="reference internal" href="#publish.discover" title="publish.discover"><code class="xref py py-func docutils literal notranslate"><span class="pre">discover()</span></code></a>.</p>
+<dl class="py function">
+<dt id="publish.read_collection_file">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">read_collection_file</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.read_collection_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a <a class="reference internal" href="#publish.Collection" title="publish.Collection"><code class="xref py py-class docutils literal notranslate"><span class="pre">Collection</span></code></a> from a yaml file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>pathlib.Path</em>) – Path to the collection file.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The collection object with no attached publications.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#publish.Collection" title="publish.Collection">Collection</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The file should have one key, “schema”, whose value is a dictionary with
+the following keys/values:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>required_artifacts</dt><dd><p>A list of artifacts names that are required</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>optional_artifacts [optional]</dt><dd><p>A list of artifacts that are optional. If not provided, the default value of []
+(empty list) will be used.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>metadata_schema [optional]</dt><dd><p>A dictionary describing a schema for validating publication metadata.  The
+dictionary should deserialize to something recognized by the cerberus package.
+If not provided, the default value of None will be used.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>allow_unspecified_artifacts [optional]</dt><dd><p>Whether or not to allow unspecified artifacts in the publications.
+Default: False.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt id="publish.read_publication_file">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">read_publication_file</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">path</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.read_publication_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a <a class="reference internal" href="#publish.Publication" title="publish.Publication"><code class="xref py py-class docutils literal notranslate"><span class="pre">Publication</span></code></a> from a yaml file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>pathlib.Path</em>) – Path to the collection file.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The publication.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#publish.Publication" title="publish.Publication">Publication</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The file should have a “metadata” key whose value is a dictionary
+of metadata. It should also have an “artifacts” key whose value is a
+dictionary mapping artifact names to artifact definitions.</p>
+<p>Only very basic validation is performed by this function. Namely, the
+metadata schema and required/optional artifacts are not enforced. See the
+<a class="reference internal" href="#publish.validate" title="publish.validate"><code class="xref py py-func docutils literal notranslate"><span class="pre">validate()</span></code></a> function for validating these aspects of the publication.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="build">
+<h2>Build<a class="headerlink" href="#build" title="Permalink to this headline">¶</a></h2>
+<p>The building of whole collections, publications, and artifacts is performed
+with the <a class="reference internal" href="#publish.build" title="publish.build"><code class="xref py py-func docutils literal notranslate"><span class="pre">build()</span></code></a> function.</p>
+<dl class="py function">
+<dt id="publish.build">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">build</code><span class="sig-paren">(</span><em class="sig-param">parent: Union[publish.Universe, publish.Collection, publish.Publication, publish.UnbuiltArtifact], *, ignore_release_time=False, now=&lt;built-in method now of type object&gt;, run=&lt;function run&gt;, exists=&lt;function Path.exists&gt;, callbacks=None</em><span class="sig-paren">)</span><a class="headerlink" href="#publish.build" title="Permalink to this definition">¶</a></dt>
+<dd><p>Build a universe/collection/publication/artifact.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> (<em>Union</em><em>[</em><a class="reference internal" href="#publish.Universe" title="publish.Universe"><em>Universe</em></a><em>, </em><a class="reference internal" href="#publish.Collection" title="publish.Collection"><em>Collection</em></a><em>, </em><a class="reference internal" href="#publish.Publication" title="publish.Publication"><em>Publication</em></a><em>, </em><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact"><em>UnbuiltArtifact</em></a><em>]</em>) – The thing to build. Operates recursively, so if given a
+<a class="reference internal" href="#publish.Universe" title="publish.Universe"><code class="xref py py-class docutils literal notranslate"><span class="pre">Universe</span></code></a>, for instance, will build all of the artifacts
+within.</p></li>
+<li><p><strong>ignore_release_time</strong> (<em>bool</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, all artifacts will be built, even if their release time
+has not yet passed.</p></li>
+<li><p><strong>callbacks</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="#publish.BuildCallbacks" title="publish.BuildCallbacks"><em>BuildCallbacks</em></a><em>]</em>) – Callbacks to be invoked during the build. If omitted, no callbacks
+are executed. See <a class="reference internal" href="#publish.BuildCallbacks" title="publish.BuildCallbacks"><code class="xref py py-class docutils literal notranslate"><span class="pre">BuildCallbacks</span></code></a> for the possible callbacks
+and their arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A copy of the parent where each leaf artifact is replaced with
+an instance of <a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-class docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>type(parent)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<p>Callbacks are invoked at certain points during the build. To provide callbacks
+to the function, subclass and override the desired members of the below class,
+and provide an instance to <a class="reference internal" href="#publish.build" title="publish.build"><code class="xref py py-func docutils literal notranslate"><span class="pre">build()</span></code></a>.</p>
+<dl class="py class">
+<dt id="publish.BuildCallbacks">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">BuildCallbacks</code><a class="headerlink" href="#publish.BuildCallbacks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Callbacks used by <a class="reference internal" href="#publish.build" title="publish.build"><code class="xref py py-func docutils literal notranslate"><span class="pre">build()</span></code></a></p>
+<dl class="py method">
+<dt id="publish.BuildCallbacks.on_build">
+<code class="sig-name descname">on_build</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">node</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuildCallbacks.on_build" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called when building a collection/publication/artifact.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.BuildCallbacks.on_recipe">
+<code class="sig-name descname">on_recipe</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">artifact</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact">publish.UnbuiltArtifact</a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuildCallbacks.on_recipe" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called when artifact is being built using its recipe.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.BuildCallbacks.on_success">
+<code class="sig-name descname">on_success</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">artifact</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact">publish.BuiltArtifact</a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuildCallbacks.on_success" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called when the build succeeded.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.BuildCallbacks.on_too_soon">
+<code class="sig-name descname">on_too_soon</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">artifact</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact">publish.UnbuiltArtifact</a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuildCallbacks.on_too_soon" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called when it is too soon to release the artifact.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="id2">
+<h2>Publish<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<dl class="py function">
+<dt id="publish.publish">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">publish</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">parent</span></em>, <em class="sig-param"><span class="n">outdir</span></em>, <em class="sig-param"><span class="n">prefix</span><span class="o">=</span><span class="default_value">''</span></em>, <em class="sig-param"><span class="n">callbacks</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.publish" title="Permalink to this definition">¶</a></dt>
+<dd><p>Publish a universe/collection/publication/artifact by copying it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> (<em>Union</em><em>[</em><a class="reference internal" href="#publish.Universe" title="publish.Universe"><em>Universe</em></a><em>, </em><a class="reference internal" href="#publish.Collection" title="publish.Collection"><em>Collection</em></a><em>, </em><a class="reference internal" href="#publish.Publication" title="publish.Publication"><em>Publication</em></a><em>, </em><a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><em>BuiltArtifact</em></a><em>]</em>) – The thing to publish.</p></li>
+<li><p><strong>outdir</strong> (<em>pathlib.Path</em>) – Path to the output directory where artifacts will be copied.</p></li>
+<li><p><strong>prefix</strong> (<em>str</em>) – String to prepend between output directory path and the keys of the
+children. If the thing being published is a <a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-class docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>,
+this is simply the filename.</p></li>
+<li><p><strong>callbacks</strong> (<a class="reference internal" href="#publish.PublishCallbacks" title="publish.PublishCallbacks"><em>PublishCallbacks</em></a>) – Callbacks to be invoked during the publication. If omitted, no
+callbacks are executed. See <a class="reference internal" href="#publish.PublishCallbacks" title="publish.PublishCallbacks"><code class="xref py py-class docutils literal notranslate"><span class="pre">PublishCallbacks</span></code></a> for the possible
+callbacks and their arguments.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The prefix is build up recursively, so that calling this function on a
+universe will publish each artifact to
+<code class="docutils literal notranslate"><span class="pre">&lt;prefix&gt;&lt;collection_key&gt;/&lt;publication_key&gt;/&lt;artifact_key&gt;</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>A copy of the parent, but with all leaf artifact nodes replace by
+<a class="reference internal" href="#publish.PublishedArtifact" title="publish.PublishedArtifact"><code class="xref py py-class docutils literal notranslate"><span class="pre">PublishedArtifact</span></code></a> instances.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>type(parent)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<p>Callbacks are invoked at certain points during the publication. To provide
+callbacks to the function, subclass and override the desired members of the
+below class, and provide an instance to <a class="reference internal" href="#module-publish" title="publish"><code class="xref py py-func docutils literal notranslate"><span class="pre">publish()</span></code></a>.</p>
+<dl class="py class">
+<dt id="publish.PublishCallbacks">
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">PublishCallbacks</code><a class="headerlink" href="#publish.PublishCallbacks" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt id="publish.PublishCallbacks.on_copy">
+<code class="sig-name descname">on_copy</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">src</span></em>, <em class="sig-param"><span class="n">dst</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.PublishCallbacks.on_copy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called when copying a file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.PublishCallbacks.on_publish">
+<code class="sig-name descname">on_publish</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">node</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.PublishCallbacks.on_publish" title="Permalink to this definition">¶</a></dt>
+<dd><p>When publish is called on a node.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="serializtion">
+<h2>Serializtion<a class="headerlink" href="#serializtion" title="Permalink to this headline">¶</a></h2>
+<p>Two functions are provided for serializing and deserializing objects to and
+from JSON.</p>
+<dl class="py function">
+<dt id="publish.serialize">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">serialize</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">node</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.serialize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Serialize the universe/collection/publication/artifact to JSON.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>node</strong> (<em>Union</em><em>[</em><a class="reference internal" href="#publish.Universe" title="publish.Universe"><em>Universe</em></a><em>, </em><a class="reference internal" href="#publish.Collection" title="publish.Collection"><em>Collection</em></a><em>, </em><a class="reference internal" href="#publish.Publication" title="publish.Publication"><em>Publication</em></a><em>, </em><em>Artifact</em><em>]</em>) – The thing to serialize as JSON.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The object serialized as JSON.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="publish.deserialize">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">deserialize</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">s</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.deserialize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reconstruct a universe/collection/publication/artifact from JSON.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>s</strong> (<em>str</em>) – The JSON to deserialize.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The reconstructed object; its type is inferred from the string.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>Universe/Collection/Publication/Artifact</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="section" id="filtering">
+<h2>Filtering<a class="headerlink" href="#filtering" title="Permalink to this headline">¶</a></h2>
+<p>Collections, publications, and artifacts can be removed using
+<a class="reference internal" href="#publish.filter_nodes" title="publish.filter_nodes"><code class="xref py py-func docutils literal notranslate"><span class="pre">filter_nodes()</span></code></a>.</p>
+<dl class="py function">
+<dt id="publish.filter_nodes">
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">filter_nodes</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">parent</span></em>, <em class="sig-param"><span class="n">predicate</span></em>, <em class="sig-param"><span class="n">callbacks</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.filter_nodes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove nodes from a Universe/Collection/Publication.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>parent</strong> – The root of the tree.</p></li>
+<li><p><strong>predicate</strong> (<em>Callable</em><em>[</em><em>[</em><em>node</em><em>]</em><em>, </em><em>bool</em><em>]</em>) – A function which takes in a node and returns True/False whether it
+should be kept.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>An object of the same type as the parent, but wth all filtered nodes
+removed. Furthermore, if a node has no children after filtering, it
+is removed.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>type(parent)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, Justin Eldridge
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
