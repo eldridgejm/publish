@@ -21,7 +21,11 @@ def example_1(tmpdir):
 def test_build_artifact_integration(example_1):
     # given
     universe = publish.discover(example_1)
-    artifact = universe.collections["homeworks"].publications["01-intro"].artifacts["solution.pdf"]
+    artifact = (
+        universe.collections["homeworks"]
+        .publications["01-intro"]
+        .artifacts["solution.pdf"]
+    )
 
     # when
     result = publish.build(artifact)
@@ -82,7 +86,9 @@ def test_build_artifact_when_release_time_is_in_future_ignore_release_time():
 
 def test_build_artifact_when_recipe_is_none():
     # given
-    artifact = publish.UnbuiltArtifact(workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None)
+    artifact = publish.UnbuiltArtifact(
+        workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None
+    )
 
     run = Mock()
     exists = Mock(return_value=True)
@@ -97,7 +103,9 @@ def test_build_artifact_when_recipe_is_none():
 
 def test_build_artifact_when_recipe_is_none_raises_if_no_file():
     # given
-    artifact = publish.UnbuiltArtifact(workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None)
+    artifact = publish.UnbuiltArtifact(
+        workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None
+    )
 
     run = Mock()
     exists = Mock(return_value=False)
@@ -131,7 +139,9 @@ def test_build_collection(example_1):
     # then
     assert (example_1 / "homeworks" / "01-intro" / "solution.pdf").exists()
     build_result = (
-        built_universe.collections["homeworks"].publications["01-intro"].artifacts["solution.pdf"]
+        built_universe.collections["homeworks"]
+        .publications["01-intro"]
+        .artifacts["solution.pdf"]
     )
     assert build_result.is_released
     assert (

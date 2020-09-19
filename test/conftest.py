@@ -1,6 +1,7 @@
 import pathlib
 from pytest import fixture
 
+
 @fixture
 def write_file(tmpdir):
     tmpdir = pathlib.Path(tmpdir)
@@ -12,4 +13,3 @@ def write_file(tmpdir):
         return path
 
     return inner
-

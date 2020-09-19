@@ -634,7 +634,7 @@ def _parse_release_time(s, metadata):
         return s
 
     short_match = re.match(r"metadata\.(\w+)$", s)
-    long_match = re.match(r"(\d) day[s]{0,1} (after|before) metadata\.(\w+)$", s)
+    long_match = re.match(r"^(\d+) day[s]{0,1} (after|before) metadata\.(\w+)$", s)
 
     if short_match:
         [variable] = short_match.groups()
@@ -933,6 +933,24 @@ class FilterCallbacks:
 
 
 def filter_nodes(parent, predicate, callbacks=None):
+    """Remove nodes from a Universe/Collection/Publication.
+
+    Parameters
+    ----------
+    parent
+        The root of the tree.
+    predicate : Callable[[node], bool]
+        A function which takes in a node and returns True/False whether it
+        should be kept.
+    
+    Returns
+    -------
+    type(parent)
+        An object of the same type as the parent, but wth all filtered nodes
+        removed. Furthermore, if a node has no children after filtering, it
+        is removed.
+
+    """
     # bottom up -- by the time the predicate is applied to publication, its artifacts
     # have been filtered
 
@@ -960,14 +978,8 @@ def filter_nodes(parent, predicate, callbacks=None):
 class BuildCallbacks:
     """Callbacks used by :func:`build`"""
 
-    def on_collection(self, collection_key, collection):
-        """Called when building a collection."""
-
-    def on_publication(self, publication_key, publication):
-        """Called when building a publication."""
-
-    def on_artifact(self, artifact_key, artifact: UnbuiltArtifact):
-        """Called when building an artifact."""
+    def on_build(self, key, node):
+        """Called when building a collection/publication/artifact."""
 
     def on_too_soon(self, artifact: UnbuiltArtifact):
         """Called when it is too soon to release the artifact."""
@@ -1032,7 +1044,7 @@ def _build_artifact(
 
         if proc.returncode:
             msg = "There was a problem while building the artifact: "
-            msg += "\n{proc.stderr.decode()}"
+            msg += f"\n{proc.stderr.decode()}"
             raise BuildError(msg)
 
         returncode = proc.returncode
@@ -1098,6 +1110,7 @@ def build(
 
     new_children = {}
     for child_key, child in parent._children.items():
+        callbacks.on_build(child_key, child)
         new_children[child_key] = build(child, **kwargs)
     return parent._replace_children(new_children)
 
@@ -1109,6 +1122,9 @@ def build(
 class PublishCallbacks:
     def on_copy(self, src, dst):
         """Called when copying a file."""
+
+    def on_publish(self, key, node):
+        """When publish is called on a node."""
 
 
 def _publish_artifact(built_artifact, outdir, filename, callbacks):
@@ -1165,6 +1181,7 @@ def publish(parent, outdir, prefix="", callbacks=None):
 
     new_children = {}
     for child_key, child in parent._children.items():
+        callbacks.on_publish(child_key, child)
         new_prefix = pathlib.Path(prefix) / child_key
         new_children[child_key] = publish(child, outdir, new_prefix, callbacks)
     new_parent = parent._replace_children(new_children)
@@ -1219,7 +1236,38 @@ def _convert_to_time(s):
         raise ValueError("Not a time.")
 
 
-def _deserialize_node(dct):
+def deserialize(s):
+    """Reconstruct a universe/collection/publication/artifact from JSON.
+
+    Parameters
+    ----------
+    s : str
+        The JSON to deserialize.
+
+    Returns
+    -------
+    Universe/Collection/Publication/Artifact
+        The reconstructed object; its type is inferred from the string.
+
+    """
+    # we need to pass a hook to json.loads in order to automatically convert
+    # datestring to date/datetime objects
+    def hook(pairs):
+        """Hook for json.loads to convert date/time-like values."""
+        d = {}
+        for k, v in pairs:
+            if isinstance(v, str):
+                try:
+                    d[k] = _convert_to_time(v)
+                except ValueError:
+                    d[k] = v
+            else:
+                d[k] = v
+        return d
+
+    dct = json.loads(s, object_pairs_hook=hook)
+
+    # infer what we're reconstructing
     if "collections" in dct:
         type_ = Universe
         children_key = "collections"
@@ -1235,24 +1283,6 @@ def _deserialize_node(dct):
     return type_._deep_fromdict(dct)
 
 
-def deserialize(s):
-    def hook(pairs):
-        """Hook for json.loads to convert date/time-like values."""
-        d = {}
-        for k, v in pairs:
-            if isinstance(v, str):
-                try:
-                    d[k] = _convert_to_time(v)
-                except ValueError:
-                    d[k] = v
-            else:
-                d[k] = v
-        return d
-
-    dct = json.loads(s, object_pairs_hook=hook)
-    return _deserialize_node(dct)
-
-
 # cli
 # --------------------------------------------------------------------------------------
 
@@ -1264,10 +1294,20 @@ def _arg_directory(s):
     return path
 
 
+def _arg_output_directory(s):
+    path = pathlib.Path(s)
+
+    if not path.exists():
+        path.mkdir(parents=True)
+        return path
+
+    return _arg_directory(path)
+
+
 def cli(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("input_directory", type=_arg_directory)
-    parser.add_argument("output_directory", type=_arg_directory)
+    parser.add_argument("output_directory", type=_arg_output_directory)
     parser.add_argument(
         "--skip-directories",
         type=str,
@@ -1277,7 +1317,6 @@ def cli(argv=None):
     parser.add_argument(
         "--ignore-release-time",
         action="store_true",
-        default=False,
         help="if provided, all artifacts will be built and published regardless of release time",
     )
     parser.add_argument(
@@ -1287,6 +1326,9 @@ def cli(argv=None):
         help="artifacts will be built and published only if their key matches this string",
     )
     args = parser.parse_args(argv)
+
+    # construct callbacks for printing information to the screen. start with
+    # helper functions for formatting terminal output
 
     def _header(message):
         return "\u001b[1m" + message + "\u001b[0m"
@@ -1306,14 +1348,28 @@ def cli(argv=None):
     def _error(message):
         return "\u001b[31m" + message + "\u001b[0m"
 
+    # the callbacks
+
     class CLIDiscoverCallbacks(DiscoverCallbacks):
+        def __init__(self):
+            self.current_collection = None
+
         def on_collection(self, path):
-            relpath = path.parent.relative_to(args.input_directory)
-            print(_header(f"Discovered collection in {relpath}"))
+            self.current_collection = path.parent.relative_to(args.input_directory)
 
         def on_publication(self, path):
-            relpath = path.parent.relative_to(args.input_directory)
-            print(_header(f"Discovered publication in {relpath}"))
+            if self.current_collection is None:
+                collection_key = "default"
+                publication_key = path.parent.name
+            else:
+                collection_key = str(self.current_collection.name)
+                publication_key = (
+                    path.parent.relative_to(args.input_directory)
+                    .relative_to(self.current_collection)
+                    .name
+                )
+
+            print(_header(f"Discovered publication {collection_key}:{publication_key}"))
 
         def on_skip(self, path):
             relpath = path.relative_to(args.input_directory)
@@ -1324,26 +1380,33 @@ def cli(argv=None):
             self.current_collection_key = None
             self.current_publication_key = None
 
-        def on_collection(self, collection_key, collection):
-            self.current_collection_key = collection_key
+        def on_build(self, key, node):
+            if isinstance(node, Collection):
+                self.current_collection_key = key
+            elif isinstance(node, Publication):
+                self.current_publication_key = key
+            else:
+                path = (
+                    f"{self.current_collection_key}"
+                    f":{self.current_publication_key}"
+                    f":{key}"
+                )
+                msg = f"Building artifact {path}"
+                print(_header(msg))
 
-        def on_publication(self, publication_key, publication):
-            self.current_publication_key = publication_key
-
-        def on_artifact(self, artifact_key, artifact):
-            path = f"{self.current_collection_key}:{self.current_publication_key}:{artifact_key}"
-            msg = f"Building artifact {path}"
-            print(_header(msg))
-
-        def on_build(self, artifact):
+        def on_recipe(self, artifact):
+            relative_workdir = artifact.workdir.relative_to(
+                args.input_directory.absolute()
+            )
+            print(_body(f"\tCurrent workdir: {relative_workdir}"))
             print(_body(f'\tExecuting "{artifact.recipe}"'))
 
         def on_too_soon(self, artifact):
-            print(
-                _warning(
-                    f"\tRelease time {artifact.release_time} has not yet been reached. Skipping."
-                )
+            msg = (
+                f"\tRelease time {artifact.release_time} has not yet been reached. "
+                "Skipping."
             )
+            print(_warning(msg))
 
         def on_success(self, output):
             print(_success("\tBuild was successful"))
@@ -1357,6 +1420,31 @@ def cli(argv=None):
             key = f"{x.collection_key}/{x.publication_key}/{x.artifact_key}"
             print(_success(f"\tKeeping {key}"))
 
+    class CLIPublishCallbacks(PublishCallbacks):
+        def __init__(self):
+            self.current_collection_key = None
+
+        def on_copy(self, src, dst):
+            src = src.relative_to(args.input_directory.absolute())
+            dst = dst.relative_to(args.output_directory)
+            msg = f"\tCopying <input_directory>/{src} to <output_directory>/{dst}."
+            print(_body(msg))
+
+        def on_publish(self, key, node):
+            if isinstance(node, Collection):
+                self.current_collection_key = key
+            elif isinstance(node, Publication):
+                self.current_publication_key = key
+            else:
+                path = (
+                    f"{self.current_collection_key}"
+                    f":{self.current_publication_key}"
+                    f":{key}"
+                )
+                print(_header(f"Publishing {path}"))
+
+    # begin the discover -> build -> publish process
+
     discovered = discover(
         args.input_directory,
         skip_directories=args.skip_directories,
@@ -1364,6 +1452,7 @@ def cli(argv=None):
     )
 
     if args.artifact_filter is not None:
+        # filter out artifacts whose keys do not match this string
 
         def keep(k, v):
             if not isinstance(v, UnbuiltArtifact):
@@ -1379,13 +1468,9 @@ def cli(argv=None):
         ignore_release_time=args.ignore_release_time,
     )
 
-    published = publish(built, args.output_directory)
+    published = publish(built, args.output_directory, callbacks=CLIPublishCallbacks())
 
-    j = serialize(published)
-    d = json.loads(j)
-
-    print(d["collections"]["homeworks"]["publications"]["01-intro"]["metadata"]["due"])
-
+    # serialize the results
     with (args.output_directory / "published.json").open("w") as fileobj:
         fileobj.write(serialize(published))
 

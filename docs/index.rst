@@ -48,7 +48,6 @@ The full API of the package is as follows:
 
 .. autosummary::
     build
-    cli
     deserialize
     discover
     filter_nodes
@@ -196,6 +195,24 @@ below class, and provide an instance to :func:`publish`.
     :members:
 
 
+Serializtion
+------------
+
+Two functions are provided for serializing and deserializing objects to and
+from JSON.
+
+.. autofunction:: serialize
+.. autofunction:: deserialize
+
+
+Filtering
+---------
+
+Collections, publications, and artifacts can be removed using
+:func:`filter_nodes`.
+
+
+.. autofunction:: filter_nodes
 
 
 Indices and tables

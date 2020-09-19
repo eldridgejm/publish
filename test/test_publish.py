@@ -32,9 +32,7 @@ def test_publish(example_1, outdir):
 
     # then
     assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
-    assert (
-        outdir / "homeworks" / "02-python" / "solution.pdf"
-    ).exists()
+    assert (outdir / "homeworks" / "02-python" / "solution.pdf").exists()
 
     assert (
         "homework.pdf"
@@ -55,9 +53,7 @@ def test_only_publish_if_released(example_1, outdir):
 
     # then
     assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
-    assert not (
-        outdir / "homeworks" / "02-python" / "solution.pdf"
-    ).exists()
+    assert not (outdir / "homeworks" / "02-python" / "solution.pdf").exists()
 
     assert (
         "solution"

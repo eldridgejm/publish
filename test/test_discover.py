@@ -23,7 +23,6 @@ EXAMPLE_4_DIRECTORY = pathlib.Path(__file__).parent / "example_4"
 EXAMPLE_5_DIRECTORY = pathlib.Path(__file__).parent / "example_5"
 
 
-
 def test_discover_finds_collections():
     # when
     universe = publish.discover(EXAMPLE_1_DIRECTORY)
@@ -149,8 +148,7 @@ def test_discover_filter_artifacts():
         if not isinstance(v, publish.UnbuiltArtifact):
             return True
 
-        return k == 'solution.pdf'
-
+        return k == "solution.pdf"
 
     universe = publish.filter_nodes(universe, keep)
 
@@ -449,6 +447,37 @@ def test_read_publication_with_relative_release_time_after(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
+def test_read_publication_with_relative_release_time_after_large(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 11 days after metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] + datetime.timedelta(days=11)
+    assert publication.artifacts["solution"].release_time == expected
+
+
 def test_read_publication_with_relative_release_date_before(write_file):
     # given
     path = write_file(
@@ -598,5 +627,3 @@ def test_read_publication_with_absolute_release_time(write_file):
     # then
     expected = datetime.datetime(2020, 1, 2, 23, 59, 0)
     assert publication.artifacts["solution"].release_time == expected
-
-

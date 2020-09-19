@@ -9,7 +9,6 @@ import publish
 EXAMPLE_1_DIRECTORY = pathlib.Path(__file__).parent / "example_1"
 
 
-
 # validate_publication
 # -----------------------------------------------------------------------------
 
