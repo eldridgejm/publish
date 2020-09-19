@@ -22,7 +22,8 @@ def test_serialize_deserialize_roundtrip():
         },
     )
 
-    original = {'homeworks': collection}
+    original = publish.Universe({'homeworks': collection})
+
 
     # when
     s = publish.serialize(original)

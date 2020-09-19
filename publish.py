@@ -19,7 +19,6 @@ A **collection** is a group of publications which all satisfy the same **schema*
 
 A **schema** is a set of constraints on a publication's artifacts and metadata.
 
-
 This establishes a **collection -> publication -> artifact hierarchy**: each
 artifact belongs to exactly one publication, and each publication belongs to
 exactly one collection.
@@ -194,6 +193,7 @@ artifact relative to the output directory, as well as a publication's metadata.
 
 from collections import deque, namedtuple, defaultdict
 from textwrap import dedent
+import abc
 import argparse
 import copy
 import datetime
@@ -224,11 +224,11 @@ class Error(Exception):
     """Generic error."""
 
 
-class SchemaError(Error):
+class ValidationError(Error):
     """Publication does not satisfy schema."""
 
 
-class InvalidFileError(Error):
+class DiscoveryError(Error):
     """A configuration file is not valid."""
 
     def __init__(self, msg, path):
@@ -245,78 +245,106 @@ class BuildError(Error):
 
 # types
 # --------------------------------------------------------------------------------------
-# we will construct a type hierarchy without inheritance.
-#
-# at the bottom of the hierarchy are artifact types. we'll create three: one
-# for unbuilt artifacts, one for built but unpublished artifacts, and another
-# for published artifacts.
-#
-# at progressively higher levels are Publications, Collections, and the Universe.
-# these three types are "internal nodes" of the hierarchy, as they each have children:
-# a universe contains collections, a collection contains publications, and a publication
-# contains artifacts. internal nodes will all have the following methods:
-#
-#   _deep_asdict()
-#       recursively convert the object to a dictionary
-#
-#   _children()
-#       return the children of the internal node
-#
-#   _replace_children(new_children)
-#       replace the children of the internal node, returning a new node instance
-#
-# these methods enable working with internal nodes in a generic way. for instance, we
-# can write a single publish() function that can accept as input a universe, collection,
-# publication, or artifact.
 
 
-class UnbuiltArtifact(typing.NamedTuple):
-    """The inputs needed to build an artifact."""
+class Artifact:
+    """Base class for all artifact types."""
 
-    #: the working directory used to build the artifact
+
+class UnbuiltArtifact(Artifact, typing.NamedTuple):
+    """The inputs needed to build an artifact.
+
+    Attributes
+    ----------
+    workdir : pathlib.Path
+        Absolute path to the working directory used to build the artifact.
+    file : str
+        Path (relative to the workdir) of the file produced by the build.
+    recipe : Union[str, None]
+        Command used to build the artifact. If None, no command is necessary.
+    release_time: Union[datetime.datetime, None]
+        Time/date the artifact should be made public. If None, it is always available.
+
+    """
+
     workdir: pathlib.Path
-
-    #: the path to the file that will be produced by the build, relative to the workdir
     file: str
-
-    #: the command used to build the artifact. if None, no command is necessary
     recipe: str = None
-
-    #: time the artifact should be made public. if None, it is always available
     release_time: datetime.datetime = None
 
 
-class BuiltArtifact(typing.NamedTuple):
-    """The results of building an artifact."""
+class BuiltArtifact(Artifact, typing.NamedTuple):
+    """The results of building an artifact.
 
-    # the working directory used to build the artifact
+    Attributes
+    ----------
+    workdir : pathlib.Path
+        Absolute path to the working directory used to build the artifact.
+    file : str
+        Path (relative to the workdir) of the file produced by the build.
+    is_released : bool
+        Whether or not the artifact's release time has passed.
+    returncode : int
+        The build process's return code. If None, there was no process.
+    stdout : str
+        The build process's stdout. If None, there was no process.
+    stderr : str
+        The build process's stderr. If None, there was no process.
+
+    """
+
     workdir: pathlib.Path
-
-    # the path to the file that is the result of the build, relative to the workdir
     file: str
-
-    # whether or not the artifact is released
     is_released: bool
+    returncode: int = None
+    stdout: str = None
+    stderr: str = None
 
-    # the stdout of the build. if None, the build didn't happen
-    proc: subprocess.CompletedProcess
 
+class PublishedArtifact(Artifact, typing.NamedTuple):
+    """A published artifact.
 
-class PublishedArtifact(typing.NamedTuple):
-    """A published artifact."""
+    Attributes
+    ----------
+    path : str
+        The path to the artifact's file relative to the output directory.
 
-    # the path to the file relative to the publication root
+    """
+
     path: str
 
 
+def _artifact_from_dict(dct):
+    """Infers the artifact type from the dictionary and performs conversion."""
+    if "recipe" in dct:
+        type_ = UnbuiltArtifact
+    elif "returncode" in dct:
+        type_ = BuiltArtifact
+    else:
+        type_ = PublishedArtifact
+
+    return type_(**dct)
+
+
+# the following are "Internal Nodes" of the collection -> publication ->
+# artifact hierarchy. they all have _children attributes and _deep_asdict
+# and _replace_children methods>
+
+
 class Publication(typing.NamedTuple):
-    """A publication."""
+    """A publication.
 
-    # a dictionary of metadata
+    Attributes
+    ----------
+    artifacts : Dict[str, Artifact]
+        The artifacts contained in the publication.
+    metadata: Dict[str, Any]
+        The metadata dictionary.
+
+    """
+
     metadata: typing.Mapping[str, typing.Any]
-
-    # a dictionary of artifacts
-    artifacts: typing.Mapping[str, UnbuiltArtifact]
+    artifacts: typing.Mapping[str, Artifact]
 
     def _deep_asdict(self):
         """A dictionary representation of the publication and its children."""
@@ -324,6 +352,15 @@ class Publication(typing.NamedTuple):
             "metadata": self.metadata,
             "artifacts": {k: a._asdict() for (k, a) in self.artifacts.items()},
         }
+
+    @classmethod
+    def _deep_fromdict(cls, dct):
+        return cls(
+            metadata=dct["metadata"],
+            artifacts={
+                k: _artifact_from_dict(d) for (k, d) in dct["artifacts"].items()
+            },
+        )
 
     @property
     def _children(self):
@@ -334,12 +371,18 @@ class Publication(typing.NamedTuple):
 
 
 class Collection(typing.NamedTuple):
-    """A collection."""
+    """A collection.
 
-    # the schema that publications should follow
+    Attributes
+    ----------
+    schema : Schema
+        The schema used to validate the publications within the collection.
+    publications : Dict[str, Publication]
+        The publications contained in the collection.
+
+    """
+
     schema: "Schema"
-
-    # a dictionary of publications
     publications: typing.Mapping[str, Publication]
 
     def _deep_asdict(self):
@@ -351,6 +394,16 @@ class Collection(typing.NamedTuple):
             },
         }
 
+    @classmethod
+    def _deep_fromdict(cls, dct):
+        return cls(
+            schema=Schema(**dct["schema"]),
+            publications={
+                k: Publication._deep_fromdict(d)
+                for (k, d) in dct["publications"].items()
+            },
+        )
+
     @property
     def _children(self):
         return self.publications
@@ -360,7 +413,15 @@ class Collection(typing.NamedTuple):
 
 
 class Universe(typing.NamedTuple):
-    """Container of all collections."""
+    """Container of all collections.
+
+    Attributes
+    ----------
+
+    collections : Dict[str, Collection]
+        The collections.
+
+    """
 
     collections: typing.Mapping[str, Collection]
 
@@ -377,20 +438,28 @@ class Universe(typing.NamedTuple):
             "collections": {k: p._deep_asdict() for (k, p) in self.collections.items()},
         }
 
+    @classmethod
+    def _deep_fromdict(cls, dct):
+        return cls(
+            collections={
+                k: Collection._deep_fromdict(d) for (k, d) in dct["collections"].items()
+            },
+        )
+
 
 class Schema(typing.NamedTuple):
     """Rules governing publications.
 
     Attributes
     ----------
-    required_artifacts : Collection[str]
+    required_artifacts : typing.Collection[str]
         Names of artifacts that publications must contain.
-    optional_artifacts : Collection[str]
+    optional_artifacts : typing.Collection[str], optional
         Names of artifacts that publication are permitted to contain. Default: empty
         list.
-    allow_unspecified_artifacts : bool
+    allow_unspecified_artifacts : bool, optional
         Is it permissible for a publication to have unknown artifacts? Default: False.
-    metadata_schema : dict
+    metadata_schema : Mapping[str, Any], optional
         A dictionary describing a schema used to validate publication metadata. In the
         style of cerberus. If None, no validation will be performed. Default: None.
 
@@ -406,13 +475,13 @@ class Schema(typing.NamedTuple):
 # --------------------------------------------------------------------------------------
 
 
-def validate(publication, against):
-    """Make sure that a publication fits within the collection.
+def validate(publication: Publication, against: Schema):
+    """Make sure that a publication satisfies the schema.
 
-    Check's the publication's metadata dictionary against
-    collection.metadata_schema. Verifies that all required artifacts are provided,
-    and that no unknown artifacts are given (unless
-    collection.allow_unspecified_artifacts == True).
+    This checks the publication's metadata dictionary against
+    ``against.metadata_schema``. Verifies that all required artifacts are
+    provided, and that no unknown artifacts are given (unless
+    ``schema.allow_unspecified_artifacts == True``).
 
     Parameters
     ----------
@@ -421,8 +490,8 @@ def validate(publication, against):
 
     Raises
     ------
-    SchemaError
-        If the publication does not satisfy the collection's constraints.
+    ValidationError
+        If the publication does not satisfy the schema's constraints.
 
     """
     schema = against
@@ -436,7 +505,7 @@ def validate(publication, against):
         validator = cerberus.Validator(schema.metadata_schema, require_all=True)
         validated = validator.validated(publication.metadata)
         if validated is None:
-            raise SchemaError(f"Invalid metadata. {validator.errors}")
+            raise ValidationError(f"Invalid metadata. {validator.errors}")
 
     # ensure that all required artifacts are present
     required = set(schema.required_artifacts)
@@ -445,10 +514,10 @@ def validate(publication, against):
     extra = provided - (required | optional)
 
     if required - provided:
-        raise SchemaError(f"Required artifacts omitted: {required - provided}.")
+        raise ValidationError(f"Required artifacts omitted: {required - provided}.")
 
     if extra and not schema.allow_unspecified_artifacts:
-        raise SchemaError(f"Unknown artifacts provided: {provided - optional}.")
+        raise ValidationError(f"Unknown artifacts provided: {provided - optional}.")
 
 
 # discovery
@@ -456,8 +525,20 @@ def validate(publication, against):
 
 
 def read_collection_file(path):
-    """Read a Collection from a yaml file.
+    """Read a :class:`Collection` from a yaml file.
 
+    Parameters
+    ----------
+    path : pathlib.Path
+        Path to the collection file.
+
+    Returns
+    -------
+    Collection
+        The collection object with no attached publications.
+
+    Notes
+    -----
     The file should have one key, "schema", whose value is a dictionary with
     the following keys/values:
 
@@ -472,16 +553,7 @@ def read_collection_file(path):
         If not provided, the default value of None will be used.
     - allow_unspecified_artifacts [optional]
         Whether or not to allow unspecified artifacts in the publications.
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        Path to the collection file.
-
-    Returns
-    -------
-    Collection
-        The collection object with no attached publications.
+        Default: False.
 
     """
     with path.open() as fileobj:
@@ -523,14 +595,14 @@ def read_collection_file(path):
     validated_contents = validator.validated(contents)
 
     if validated_contents is None:
-        raise InvalidFileError(str(validator.errors), path)
+        raise DiscoveryError(str(validator.errors), path)
 
     # make sure that the metadata schema is valid
     if validated_contents["schema"]["metadata_schema"] is not None:
         try:
             cerberus.Validator(validated_contents["schema"]["metadata_schema"])
         except Exception as exc:
-            raise InvalidFileError("Invalid metadata schema.", path)
+            raise DiscoveryError("Invalid metadata schema.", path)
 
     schema = Schema(**validated_contents["schema"])
     return Collection(schema=schema, publications={})
@@ -554,7 +626,7 @@ def _parse_release_time(s, metadata):
 
     Raises
     ------
-    SchemaError
+    ValidationError
         If the relative date string format is incorrect.
 
     """
@@ -584,11 +656,7 @@ def _parse_release_time(s, metadata):
 
 
 def read_publication_file(path):
-    """Read a Publication from a yaml file.
-
-    The file should have a "metadata" key whose value is a dictionary obeying
-    collection.metadata_schema. It should also have an "artifacts" key whose value is a
-    dictionary mapping artifact names to artifact definitions.
+    """Read a :class:`Publication` from a yaml file.
 
     Parameters
     ----------
@@ -599,6 +667,18 @@ def read_publication_file(path):
     -------
     Publication
         The publication.
+
+    Notes
+    -----
+
+    The file should have a "metadata" key whose value is a dictionary
+    of metadata. It should also have an "artifacts" key whose value is a
+    dictionary mapping artifact names to artifact definitions.
+
+    Only very basic validation is performed by this function. Namely, the
+    metadata schema and required/optional artifacts are not enforced. See the
+    :func:`validate` function for validating these aspects of the publication.
+
 
     """
     with path.open() as fileobj:
@@ -629,7 +709,7 @@ def read_publication_file(path):
     validated = validator.validated(contents)
 
     if validated is None:
-        raise InvalidFileError(str(validator.errors), path)
+        raise DiscoveryError(str(validator.errors), path)
 
     metadata = validated["metadata"]
 
@@ -642,7 +722,7 @@ def read_publication_file(path):
                 definition["release_time"], metadata
             )
         except ValueError as exc:
-            raise InvalidFileError(str(exc), path)
+            raise DiscoveryError(str(exc), path)
 
         # if no file is provided, use the key
         if definition["file"] is None:
@@ -658,14 +738,37 @@ def read_publication_file(path):
 
 
 class DiscoverCallbacks:
+    """Callbacks used in :func:`discover`. Defaults do nothing."""
+
     def on_collection(self, path):
-        """When a collection is discovered."""
+        """When a collection is discovered.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            The path of the collection file.
+
+        """
 
     def on_publication(self, path):
-        """When a publication is discovered."""
+        """When a publication is discovered.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            The path of the publication file.
+
+        """
 
     def on_skip(self, path):
-        """When a directory is skipped."""
+        """When a directory is skipped.
+
+        Parameters
+        ----------
+        path : pathlib.Path
+            The path of the directory to be skipped.
+
+        """
 
 
 # represents a node in the BFS used in discover()
@@ -686,9 +789,7 @@ def _discover_bfs(
         is_publication = (node.path / PUBLICATION_FILE).is_file()
 
         if is_collection and is_publication:
-            raise InvalidFileError(
-                "Cannot be both a publication and a collection.", path
-            )
+            raise DiscoveryError("Cannot be both a publication and a collection.", path)
 
         if is_collection:
             collection = make_collection(node)
@@ -716,23 +817,42 @@ def _discover_bfs(
 
 
 def discover(
-    root: pathlib.Path,
-    default_collection=None,
-    skip_directories=None,
-    callbacks=DiscoverCallbacks(),
-):
-    """Discover the collections and publications in the filesystem."""
+    input_directory: pathlib.Path,
+    skip_directories: typing.Optional[typing.Collection[str]] = None,
+    callbacks: typing.Optional[DiscoverCallbacks] = None,
+) -> Universe:
+    """Discover the collections and publications in the filesystem.
+
+    Parameters
+    ----------
+    input_directory
+        The path to the directory that will be recursively searched.
+    skip_directories
+        A collection of directory names that should be skipped if discovered.
+        If None, no directories will be skipped.
+    callbacks : Optional[DiscoverCallbacks]
+        Callbacks to be invoked during the discovery. If omitted, no callbacks
+        are executed. See :class:`DiscoverCallbacks` for the possible callbacks
+        and their arguments.
+
+    Returns
+    -------
+    Universe
+        The collections and the nested publications and artifacts, contained in
+        a :class:`Universe` instance.
+
+    """
     if skip_directories is None:
         skip_directories = set()
 
+    if callbacks is None:
+        callbacks = DiscoverCallbacks()
+
     # the collection publications are added to if they belong to no other collection
-    if default_collection is None:
-        default_schema = Schema(
-            required_artifacts=[],
-            metadata_schema=None,
-            allow_unspecified_artifacts=True,
-        )
-        default_collection = Collection(schema=default_schema, publications={})
+    default_schema = Schema(
+        required_artifacts=[], metadata_schema=None, allow_unspecified_artifacts=True,
+    )
+    default_collection = Collection(schema=default_schema, publications={})
 
     # by default, we have just the default collection; we'll discover more
     collections = {"default": default_collection}
@@ -741,7 +861,9 @@ def discover(
     # hierarchy. each BFS node will be a triple of the current directory, the
     # parent collection, and the path to the parent collection's directory
     initial_node = _BFSNode(
-        path=root, parent_collection=default_collection, parent_collection_path=root,
+        path=input_directory,
+        parent_collection=default_collection,
+        parent_collection_path=input_directory,
     )
 
     # to simplify the code, our BFS function will outsource the creation and validation
@@ -753,14 +875,14 @@ def discover(
 
         # ensure no nested collections
         if parent_collection is not default_collection:
-            raise InvalidFileError("Nested collection found.", path)
+            raise DiscoveryError("Nested collection found.", path)
 
         # create the collection
         collection_file = path / COLLECTION_FILE
         new_collection = read_collection_file(collection_file)
 
         # add it to the rest of the collections
-        key = str(path.relative_to(root))
+        key = str(path.relative_to(input_directory))
         collections[key] = new_collection
 
         # callback
@@ -770,7 +892,7 @@ def discover(
         return collections[key]
 
     def make_publication(node: _BFSNode):
-        """Called when a  new publication is discovered."""
+        """Called when a new publication is discovered."""
         path, parent_collection, parent_collection_path = node
 
         # read the publication file
@@ -780,8 +902,8 @@ def discover(
         # validate its contents against parent collection's schema
         try:
             validate(publication, against=parent_collection.schema)
-        except SchemaError as exc:
-            raise InvalidFileError(str(exc), publication_file)
+        except ValidationError as exc:
+            raise DiscoveryError(str(exc), publication_file)
 
         # add the publication to the parent collection
         key = str(path.relative_to(parent_collection_path))
@@ -798,7 +920,7 @@ def discover(
     return Universe(collections)
 
 
-# filter_artifacts()
+# filter_nodes()
 # --------------------------------------------------------------------------------------
 
 
@@ -836,7 +958,7 @@ def filter_nodes(parent, predicate, callbacks=None):
 
 
 class BuildCallbacks:
-    """Callbacks used by build()"""
+    """Callbacks used by :func:`build`"""
 
     def on_collection(self, collection_key, collection):
         """Called when building a collection."""
@@ -844,16 +966,16 @@ class BuildCallbacks:
     def on_publication(self, publication_key, publication):
         """Called when building a publication."""
 
-    def on_artifact(self, artifact_key, artifact):
+    def on_artifact(self, artifact_key, artifact: UnbuiltArtifact):
         """Called when building an artifact."""
 
-    def on_too_soon(self, artifact):
+    def on_too_soon(self, artifact: UnbuiltArtifact):
         """Called when it is too soon to release the artifact."""
 
-    def on_build(self, artifact):
-        """Called when artifact is being built."""
+    def on_recipe(self, artifact: UnbuiltArtifact):
+        """Called when artifact is being built using its recipe."""
 
-    def on_success(self, build_result):
+    def on_success(self, artifact: BuiltArtifact):
         """Called when the build succeeded."""
 
 
@@ -883,7 +1005,7 @@ def _build_artifact(
 
     """
     output = BuiltArtifact(
-        workdir=artifact.workdir, file=artifact.file, is_released=False, proc=None
+        workdir=artifact.workdir, file=artifact.file, is_released=False
     )
 
     if (
@@ -895,9 +1017,11 @@ def _build_artifact(
         return output
 
     if artifact.recipe is None:
-        proc = None
+        stdout = None
+        stderr = None
+        returncode = None
     else:
-        callbacks.on_build(artifact)
+        callbacks.on_recipe(artifact)
 
         kwargs = {
             "cwd": artifact.workdir,
@@ -911,24 +1035,56 @@ def _build_artifact(
             msg += "\n{proc.stderr.decode()}"
             raise BuildError(msg)
 
+        returncode = proc.returncode
+        stdout = proc.stdout.decode()
+        stderr = proc.stderr.decode()
+
     filepath = artifact.workdir / artifact.file
     if not exists(filepath):
         raise BuildError(f"Artifact file {filepath} does not exist.")
 
-    output = output._replace(is_released=True, proc=proc)
+    output = output._replace(
+        is_released=True, returncode=returncode, stdout=stdout, stderr=stderr
+    )
     callbacks.on_success(output)
     return output
 
 
 def build(
-    parent,
+    parent: typing.Union[Universe, Collection, Publication, UnbuiltArtifact],
     *,
     ignore_release_time=False,
     now=datetime.datetime.now,
     run=subprocess.run,
     exists=pathlib.Path.exists,
-    callbacks=BuildCallbacks(),
+    callbacks=None,
 ):
+    """Build a universe/collection/publication/artifact.
+
+    Parameters
+    ----------
+    parent : Union[Universe, Collection, Publication, UnbuiltArtifact]
+        The thing to build. Operates recursively, so if given a
+        :class:`Universe`, for instance, will build all of the artifacts
+        within.
+    ignore_release_time : bool
+        If ``True``, all artifacts will be built, even if their release time
+        has not yet passed.
+    callbacks : Optional[BuildCallbacks]
+        Callbacks to be invoked during the build. If omitted, no callbacks
+        are executed. See :class:`BuildCallbacks` for the possible callbacks
+        and their arguments.
+
+    Returns
+    -------
+    type(parent)
+        A copy of the parent where each leaf artifact is replaced with
+        an instance of :class:`BuiltArtifact`.
+
+    """
+    if callbacks is None:
+        callbacks = BuildCallbacks()
+
     kwargs = dict(
         ignore_release_time=ignore_release_time,
         now=now,
@@ -950,7 +1106,12 @@ def build(
 # --------------------------------------------------------------------------------------
 
 
-def _publish_artifact(built_artifact, outdir, filename):
+class PublishCallbacks:
+    def on_copy(self, src, dst):
+        """Called when copying a file."""
+
+
+def _publish_artifact(built_artifact, outdir, filename, callbacks):
 
     if not built_artifact.is_released:
         return PublishedArtifact(None)
@@ -959,19 +1120,53 @@ def _publish_artifact(built_artifact, outdir, filename):
     full_dst = outdir / filename
     full_dst.parent.mkdir(parents=True, exist_ok=True)
     full_src = built_artifact.workdir / built_artifact.file
+    callbacks.on_copy(full_src, full_dst)
     shutil.copy(full_src, full_dst)
 
     return PublishedArtifact(path=full_dst.relative_to(outdir))
 
 
-def publish(parent, outdir, prefix=""):
+def publish(parent, outdir, prefix="", callbacks=None):
+    """Publish a universe/collection/publication/artifact by copying it.
+
+    Parameters
+    ----------
+    parent : Union[Universe, Collection, Publication, BuiltArtifact]
+        The thing to publish.
+    outdir : pathlib.Path
+        Path to the output directory where artifacts will be copied.
+    prefix : str
+        String to prepend between output directory path and the keys of the
+        children. If the thing being published is a :class:`BuiltArtifact`,
+        this is simply the filename.
+    callbacks : PublishCallbacks
+        Callbacks to be invoked during the publication. If omitted, no
+        callbacks are executed. See :class:`PublishCallbacks` for the possible
+        callbacks and their arguments.
+
+    Notes
+    -----
+    The prefix is build up recursively, so that calling this function on a
+    universe will publish each artifact to 
+    ``<prefix><collection_key>/<publication_key>/<artifact_key>``
+
+    Returns
+    -------
+    type(parent)
+        A copy of the parent, but with all leaf artifact nodes replace by
+        :class:`PublishedArtifact` instances.
+
+    """
+    if callbacks is None:
+        callbacks = PublishCallbacks()
+
     if isinstance(parent, BuiltArtifact):
-        return _publish_artifact(parent, outdir, prefix)
+        return _publish_artifact(parent, outdir, prefix, callbacks)
 
     new_children = {}
     for child_key, child in parent._children.items():
         new_prefix = pathlib.Path(prefix) / child_key
-        new_children[child_key] = publish(child, outdir, new_prefix)
+        new_children[child_key] = publish(child, outdir, new_prefix, callbacks)
     new_parent = parent._replace_children(new_children)
 
     def keep_non_null_artifacts(k, v):
@@ -988,10 +1183,27 @@ def publish(parent, outdir, prefix=""):
 
 
 def serialize(node):
+    """Serialize the universe/collection/publication/artifact to JSON.
+
+    Parameters
+    ----------
+    node : Union[Universe, Collection, Publication, Artifact]
+        The thing to serialize as JSON.
+
+    Returns
+    -------
+    str
+        The object serialized as JSON.
+
+    """
+
     def converter(o):
         return str(o)
 
-    dct = node._deep_asdict()
+    if isinstance(node, Artifact):
+        dct = node._asdict()
+    else:
+        dct = node._deep_asdict()
 
     return json.dumps(dct, default=converter, indent=4)
 
@@ -1007,8 +1219,25 @@ def _convert_to_time(s):
         raise ValueError("Not a time.")
 
 
+def _deserialize_node(dct):
+    if "collections" in dct:
+        type_ = Universe
+        children_key = "collections"
+    elif "publications" in dct:
+        type_ = Collection
+        children_key = "publications"
+    elif "artifacts" in dct:
+        type_ = Publication
+        children_key = "artifacts"
+    else:
+        return _artifact_from_dict(dct)
+
+    return type_._deep_fromdict(dct)
+
+
 def deserialize(s):
     def hook(pairs):
+        """Hook for json.loads to convert date/time-like values."""
         d = {}
         for k, v in pairs:
             if isinstance(v, str):
@@ -1021,17 +1250,7 @@ def deserialize(s):
         return d
 
     dct = json.loads(s, object_pairs_hook=hook)
-    for collection_key, collection_dct in dct.items():
-        publications = {}
-        for publication_key, publication_dct in collection_dct["publications"].items():
-            for artifact_key, artifact_path in publication_dct["artifacts"].items():
-                publication_dct["artifacts"][artifact_key] = PublishedArtifact(
-                    **artifact_path
-                )
-            publications[publication_key] = Publication(**publication_dct)
-        schema = Schema(**collection_dct["schema"])
-        dct[collection_key] = Collection(publications=publications, schema=schema)
-    return dct
+    return _deserialize_node(dct)
 
 
 # cli

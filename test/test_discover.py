@@ -1,8 +1,8 @@
 import datetime
 import pathlib
-import textwrap
+from textwrap import dedent
 
-from pytest import raises
+from pytest import raises, fixture
 
 import publish
 
@@ -21,6 +21,7 @@ EXAMPLE_4_DIRECTORY = pathlib.Path(__file__).parent / "example_4"
 
 # relative paths as keys
 EXAMPLE_5_DIRECTORY = pathlib.Path(__file__).parent / "example_5"
+
 
 
 def test_discover_finds_collections():
@@ -95,17 +96,17 @@ def test_discover_loads_dates_as_dates():
 
 def test_discover_validates_collection_schema():
     # when run on a malformed collection.yaml
-    with raises(publish.InvalidFileError):
+    with raises(publish.DiscoveryError):
         publish.discover(EXAMPLE_2_DIRECTORY)
 
 
 def test_discover_validates_publication_schema():
-    with raises(publish.InvalidFileError):
+    with raises(publish.DiscoveryError):
         publish.discover(EXAMPLE_3_DIRECTORY)
 
 
 def test_dicover_raises_when_nested_collections_discovered():
-    with raises(publish.InvalidFileError):
+    with raises(publish.DiscoveryError):
         publish.discover(EXAMPLE_4_DIRECTORY)
 
 
@@ -162,3 +163,440 @@ def test_discover_filter_artifacts():
         "solution.pdf"
         in universe.collections["homeworks"].publications["01-intro"].artifacts
     )
+
+
+# read_collection_file
+# -----------------------------------------------------------------------------
+
+
+def test_read_collection_example(write_file):
+    # given
+    path = write_file(
+        "collection.yaml",
+        contents=dedent(
+            """
+            schema:
+                required_artifacts:
+                    - homework
+                    - solution
+
+                optional_artifacts:
+                    - template
+
+                metadata_schema:
+                    name: 
+                        type: string
+                    due:
+                        type: date
+            """
+        ),
+    )
+
+    # when
+    collection = publish.read_collection_file(path)
+
+    # then
+    assert collection.schema.required_artifacts == ["homework", "solution"]
+    assert collection.schema.optional_artifacts == ["template"]
+    assert collection.schema.metadata_schema["name"]["type"] == "string"
+
+
+def test_read_collection_validates_fields(write_file):
+    path = write_file(
+        "collection.yaml",
+        contents=dedent(
+            """
+            schema:
+                # this ain't right..., should be a list of str
+                required_artifacts: 42
+
+                optional_artifacts:
+                    - template
+
+                metadata_schema:
+                    name: 
+                        type: string
+                    due:
+                        type: date
+            """
+        ),
+    )
+
+    # then
+    with raises(publish.DiscoveryError):
+        collection = publish.read_collection_file(path)
+
+
+def test_read_collection_requires_required_artifacts(write_file):
+    path = write_file(
+        "collection.yaml",
+        contents=dedent(
+            """
+            schema:
+                # this ain't right..., should have required_artifacts...
+
+                optional_artifacts:
+                    - template
+
+                metadata_schema:
+                    name: 
+                        type: string
+                    due:
+                        type: date
+            """
+        ),
+    )
+
+    # then
+    with raises(publish.DiscoveryError):
+        collection = publish.read_collection_file(path)
+
+
+def test_read_collection_doesnt_require_optional_artifacts(write_file):
+    # given
+    path = write_file(
+        "collection.yaml",
+        contents=dedent(
+            """
+            schema:
+                required_artifacts:
+                    - foo
+                    - bar
+
+                metadata_schema:
+                    name: 
+                        type: string
+                    due:
+                        type: date
+            """
+        ),
+    )
+
+    # when
+    collection = publish.read_collection_file(path)
+
+    # then
+    assert collection.schema.optional_artifacts == []
+
+
+def test_read_collection_doesnt_require_metadata_schema(write_file):
+    # given
+    path = write_file(
+        "collection.yaml",
+        contents=dedent(
+            """
+            schema:
+                required_artifacts:
+                    - foo
+                    - bar
+            """
+        ),
+    )
+
+    # when
+    collection = publish.read_collection_file(path)
+
+    # then
+    assert collection.schema.metadata_schema is None
+
+
+def test_read_collection_raises_on_invalid_metadata_schema(write_file):
+    # given
+    path = write_file(
+        "collection.yaml",
+        contents=dedent(
+            """
+            schema:
+                required_artifacts:
+                    - foo
+                    - bar
+
+                metadata_schema:
+                    foo: 1
+                    bar: 2
+            """
+        ),
+    )
+
+    # when then
+    with raises(publish.DiscoveryError):
+        collection = publish.read_collection_file(path)
+
+
+# read_publication_file
+# -----------------------------------------------------------------------------
+
+
+def test_read_publication_example(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    assert publication.metadata["name"] == "Homework 01"
+    assert isinstance(publication.metadata["due"], datetime.datetime)
+    assert isinstance(publication.metadata["released"], datetime.date)
+    assert publication.artifacts["homework"].recipe == "make homework"
+
+
+def test_read_publication_with_relative_release_time(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"]
+    assert publication.artifacts["solution"].release_time == expected
+
+
+def test_read_publication_with_relative_release_date(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: metadata.released
+            """
+        ),
+    )
+
+    # then
+    with raises(publish.DiscoveryError):
+        publication = publish.read_publication_file(path)
+
+
+def test_read_publication_with_relative_release_time_after(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 1 day after metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] + datetime.timedelta(days=1)
+    assert publication.artifacts["solution"].release_time == expected
+
+
+def test_read_publication_with_relative_release_date_before(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 3 days before metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] - datetime.timedelta(days=3)
+    assert publication.artifacts["solution"].release_time == expected
+
+
+def test_read_publication_with_relative_release_time_multiple_days(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 3 days after metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] + datetime.timedelta(days=3)
+    assert publication.artifacts["solution"].release_time == expected
+
+
+def test_read_publication_with_invalid_relative_date_raises(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: -1 days after metadata.due
+            """
+        ),
+    )
+
+    # when
+    with raises(publish.DiscoveryError):
+        publication = publish.read_publication_file(path)
+
+
+def test_read_publication_with_invalid_relative_date_variable_reference_raises(
+    write_file,
+):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 1 days after metadata.foo
+            """
+        ),
+    )
+
+    # when
+    with raises(publish.DiscoveryError):
+        publication = publish.read_publication_file(path)
+
+
+def test_read_publication_with_absolute_release_time(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 2020-01-02 23:59:00
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = datetime.datetime(2020, 1, 2, 23, 59, 0)
+    assert publication.artifacts["solution"].release_time == expected
+
+
