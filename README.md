@@ -96,16 +96,16 @@ writing a `collection.yaml` file in the `homeworks` directory:
 
 ```yaml
 # course/homeworks/collection.yaml
+schema:
+    required_artifacts:
+        - homework.pdf
+        - solution.pdf
 
-required_artifacts:
-    - homework.pdf
-    - solution.pdf
-
-metadata_schema:
-    name:
-        type: str
-    due:
-        type: datetime
+    metadata_schema:
+        name:
+            type: str
+        due:
+            type: datetime
 ```
 
 This tells *publish* that all publications found below `homeworks/` need to have
@@ -133,7 +133,7 @@ course staff to use, even if they haven't been released yet:
 Or maybe we only want to publish homeworks:
 
 ```bash
-> publish input output --ignore-directories labs
+> publish input output --skip-directories labs
 ```
 
 That's pretty much it. See https://eldridgejm.github.io/publish/ for the full
