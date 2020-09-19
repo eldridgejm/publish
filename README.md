@@ -136,4 +136,5 @@ Or maybe we only want to publish homeworks:
 > publish input output --ignore-directories labs
 ```
 
-See https://eldridgejm.github.io/publish/ for more documentation. 
+That's pretty much it. See https://eldridgejm.github.io/publish/ for the full
+documentation. 
