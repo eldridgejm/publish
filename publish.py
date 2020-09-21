@@ -1351,54 +1351,24 @@ def cli(argv=None):
     # the callbacks
 
     class CLIDiscoverCallbacks(DiscoverCallbacks):
-        def __init__(self):
-            self.current_collection = None
-
-        def on_collection(self, path):
-            self.current_collection = path.parent.relative_to(args.input_directory)
 
         def on_publication(self, path):
-            if self.current_collection is None:
-                collection_key = "default"
-                publication_key = path.parent.name
-            else:
-                collection_key = str(self.current_collection.name)
-                publication_key = (
-                    path.parent.relative_to(args.input_directory)
-                    .relative_to(self.current_collection)
-                    .name
-                )
-
-            print(_header(f"Discovered publication {collection_key}:{publication_key}"))
+            print(_header(f"Discovered publication {path}"))
 
         def on_skip(self, path):
             relpath = path.relative_to(args.input_directory)
             print(_warning(f"Skipping directory {relpath}"))
 
     class CLIBuildCallbacks(BuildCallbacks):
-        def __init__(self):
-            self.current_collection_key = None
-            self.current_publication_key = None
 
         def on_build(self, key, node):
-            if isinstance(node, Collection):
-                self.current_collection_key = key
-            elif isinstance(node, Publication):
-                self.current_publication_key = key
-            else:
-                path = (
-                    f"{self.current_collection_key}"
-                    f":{self.current_publication_key}"
-                    f":{key}"
+            if isinstance(node, UnbuiltArtifact):
+                relative_workdir = node.workdir.relative_to(
+                    args.input_directory.absolute()
                 )
-                msg = f"Building artifact {path}"
-                print(_header(msg))
+                print(_header(f"Building {relative_workdir}/{key}"))
 
         def on_recipe(self, artifact):
-            relative_workdir = artifact.workdir.relative_to(
-                args.input_directory.absolute()
-            )
-            print(_body(f"\tCurrent workdir: {relative_workdir}"))
             print(_body(f'\tExecuting "{artifact.recipe}"'))
 
         def on_too_soon(self, artifact):
@@ -1421,9 +1391,6 @@ def cli(argv=None):
             print(_success(f"\tKeeping {key}"))
 
     class CLIPublishCallbacks(PublishCallbacks):
-        def __init__(self):
-            self.current_collection_key = None
-
         def on_copy(self, src, dst):
             src = src.relative_to(args.input_directory.absolute())
             dst = dst.relative_to(args.output_directory)
@@ -1431,17 +1398,11 @@ def cli(argv=None):
             print(_body(msg))
 
         def on_publish(self, key, node):
-            if isinstance(node, Collection):
-                self.current_collection_key = key
-            elif isinstance(node, Publication):
-                self.current_publication_key = key
-            else:
-                path = (
-                    f"{self.current_collection_key}"
-                    f":{self.current_publication_key}"
-                    f":{key}"
+            if isinstance(node, BuiltArtifact):
+                relative_workdir = node.workdir.relative_to(
+                    args.input_directory.absolute()
                 )
-                print(_header(f"Publishing {path}"))
+                print(_header(f"Publishing {relative_workdir}/{key}"))
 
     # begin the discover -> build -> publish process
 
