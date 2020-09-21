@@ -6,6 +6,6 @@ setup(
     version="0.1.0",
     py_modules=["publish"],
     install_requires=["pyyaml", "cerberus"],
-    tests_require=["pytest", "black"],
+    tests_require=["pytest"],
     entry_points={"console_scripts": ["publish = publish:cli"]},
 )
