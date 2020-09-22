@@ -1187,7 +1187,7 @@ def publish(parent, outdir, prefix="", callbacks=None):
     new_parent = parent._replace_children(new_children)
 
     def keep_non_null_artifacts(k, v):
-        if not isinstance(v, BuiltArtifact):
+        if not isinstance(v, PublishedArtifact):
             return True
         else:
             return v.path is not None

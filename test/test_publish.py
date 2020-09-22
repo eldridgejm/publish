@@ -56,6 +56,6 @@ def test_only_publish_if_released(example_1, outdir):
     assert not (outdir / "homeworks" / "02-python" / "solution.pdf").exists()
 
     assert (
-        "solution"
+        "solution.pdf"
         not in published.collections["homeworks"].publications["02-python"].artifacts
     )
