@@ -1307,7 +1307,19 @@ def _arg_output_directory(s):
     return _arg_directory(path)
 
 
-def cli(argv=None):
+def cli(argv=None, now=datetime.datetime.now):
+    """The command line interface.
+
+    Parameters
+    ----------
+    argv : List[str]
+        A list of command line arguments. If None, the arguments will be read from the
+        command line passed to the process by the shell.
+    now : Callable[[], datetime.datetime]
+        A callable producing the current datetime. This is useful when testing, as it
+        allows you to inject a fixed, known time.
+
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("input_directory", type=_arg_directory)
     parser.add_argument("output_directory", type=_arg_output_directory)
@@ -1428,6 +1440,7 @@ def cli(argv=None):
         discovered,
         callbacks=CLIBuildCallbacks(),
         ignore_release_time=args.ignore_release_time,
+        now=now,
     )
 
     published = publish(built, args.output_directory, callbacks=CLIPublishCallbacks())
