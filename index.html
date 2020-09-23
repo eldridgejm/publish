@@ -311,10 +311,16 @@ collection -&gt; publication -&gt; artifact hierarchy.</p>
 artifact relative to the output directory, as well as a publication’s metadata.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">json</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">d</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;published.json&#39;</span><span class="p">))</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;collections&#39;</span><span class="p">][</span><span class="s1">&#39;homeworks&#39;</span><span class="p">][</span><span class="s1">&#39;publications&#39;</span><span class="p">][</span><span class="s1">&#39;01-intro&#39;</span><span class="p">][</span><span class="s1">&#39;artifacts&#39;</span><span class="p">][</span><span class="s1">&#39;homework.pdf&#39;</span><span class="p">][</span><span class="s1">&#39;path&#39;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;collections&#39;</span><span class="p">][</span><span class="s1">&#39;homeworks&#39;</span><span class="p">][</span><span class="s1">&#39;publications&#39;</span><span class="p">][</span><span class="s1">&#39;01-intro&#39;</span><span class="p">][</span><span class="s1">&#39;artifacts&#39;</span><span class="p">][</span><span class="s1">&#39;homework.pdf&#39;</span><span class="p">][</span><span class="s1">&#39;path&#39;</span><span class="p">]</span>
 <span class="go">homeworks/01-intro/homework.pdf</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;collections&#39;</span><span class="p">][</span><span class="s1">&#39;homeworks&#39;</span><span class="p">][</span><span class="s1">&#39;publications&#39;</span><span class="p">][</span><span class="s1">&#39;01-intro&#39;</span><span class="p">][</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;due&#39;</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;collections&#39;</span><span class="p">][</span><span class="s1">&#39;homeworks&#39;</span><span class="p">][</span><span class="s1">&#39;publications&#39;</span><span class="p">][</span><span class="s1">&#39;01-intro&#39;</span><span class="p">][</span><span class="s1">&#39;metadata&#39;</span><span class="p">][</span><span class="s1">&#39;due&#39;</span><span class="p">]</span>
 <span class="go">2020-09-10 23:59:00</span>
+</pre></div>
+</div>
+<p>Artifacts which are defined but not yet released still appear in this dictionary, but
+their path attribute is set to <code class="docutils literal notranslate"><span class="pre">None</span></code>. For instance:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;collections&#39;</span><span class="p">][</span><span class="s1">&#39;homeworks&#39;</span><span class="p">][</span><span class="s1">&#39;publications&#39;</span><span class="p">][</span><span class="s1">&#39;01-intro&#39;</span><span class="p">][</span><span class="s1">&#39;artifacts&#39;</span><span class="p">][</span><span class="s1">&#39;solution.pdf&#39;</span><span class="p">][</span><span class="s1">&#39;path&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span>
+<span class="go">True</span>
 </pre></div>
 </div>
 </div>
@@ -1014,20 +1020,20 @@ callbacks are executed. See <a class="reference internal" href="#publish.Publish
 callbacks and their arguments.</p></li>
 </ul>
 </dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A copy of the parent, but with all leaf artifact nodes replace by
+<a class="reference internal" href="#publish.PublishedArtifact" title="publish.PublishedArtifact"><code class="xref py py-class docutils literal notranslate"><span class="pre">PublishedArtifact</span></code></a> instances. Artifacts which have not yet
+been released are still converted to PublishedArtifact, but their <code class="docutils literal notranslate"><span class="pre">path</span></code>
+is set to <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>type(parent)</p>
+</dd>
 </dl>
 <p class="rubric">Notes</p>
 <p>The prefix is build up recursively, so that calling this function on a
 universe will publish each artifact to
 <code class="docutils literal notranslate"><span class="pre">&lt;prefix&gt;&lt;collection_key&gt;/&lt;publication_key&gt;/&lt;artifact_key&gt;</span></code></p>
-<dl class="field-list simple">
-<dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p>A copy of the parent, but with all leaf artifact nodes replace by
-<a class="reference internal" href="#publish.PublishedArtifact" title="publish.PublishedArtifact"><code class="xref py py-class docutils literal notranslate"><span class="pre">PublishedArtifact</span></code></a> instances.</p>
-</dd>
-<dt class="field-even">Return type</dt>
-<dd class="field-even"><p>type(parent)</p>
-</dd>
-</dl>
 </dd></dl>
 
 <p>Callbacks are invoked at certain points during the publication. To provide
