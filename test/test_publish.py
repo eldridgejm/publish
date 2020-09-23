@@ -40,7 +40,7 @@ def test_publish(example_1, outdir):
     )
 
 
-def test_only_publish_if_released(example_1, outdir):
+def test_publish_even_if_not_released(example_1, outdir):
     # given
     discovered = publish.discover(example_1)
     built = publish.build(discovered)
@@ -56,6 +56,9 @@ def test_only_publish_if_released(example_1, outdir):
     assert not (outdir / "homeworks" / "02-python" / "solution.pdf").exists()
 
     assert (
-        "solution.pdf"
-        not in published.collections["homeworks"].publications["02-python"].artifacts
+        published.collections["homeworks"]
+        .publications["02-python"]
+        .artifacts["solution.pdf"]
+        .path
+        is None
     )

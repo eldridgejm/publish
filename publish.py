@@ -184,10 +184,18 @@ artifact relative to the output directory, as well as a publication's metadata.
 
     >>> import json
     >>> d = json.load(open('published.json'))
-    >>> print(d['collections']['homeworks']['publications']['01-intro']['artifacts']['homework.pdf']['path'])
+    >>> d['collections']['homeworks']['publications']['01-intro']['artifacts']['homework.pdf']['path']
     homeworks/01-intro/homework.pdf
-    >>> print(d['collections']['homeworks']['publications']['01-intro']['metadata']['due'])
+    >>> d['collections']['homeworks']['publications']['01-intro']['metadata']['due']
     2020-09-10 23:59:00
+
+Artifacts which are defined but not yet released still appear in this dictionary, but
+their path attribute is set to ``None``. For instance:
+
+.. code-block:: python
+
+    >>> d['collections']['homeworks']['publications']['01-intro']['artifacts']['solution.pdf']['path'] is None
+    True
 
 """
 
@@ -1160,17 +1168,19 @@ def publish(parent, outdir, prefix="", callbacks=None):
         callbacks are executed. See :class:`PublishCallbacks` for the possible
         callbacks and their arguments.
 
+    Returns
+    -------
+    type(parent)
+        A copy of the parent, but with all leaf artifact nodes replace by
+        :class:`PublishedArtifact` instances. Artifacts which have not yet
+        been released are still converted to PublishedArtifact, but their ``path``
+        is set to ``None``.
+    
     Notes
     -----
     The prefix is build up recursively, so that calling this function on a
     universe will publish each artifact to 
     ``<prefix><collection_key>/<publication_key>/<artifact_key>``
-
-    Returns
-    -------
-    type(parent)
-        A copy of the parent, but with all leaf artifact nodes replace by
-        :class:`PublishedArtifact` instances.
 
     """
     if callbacks is None:
@@ -1184,15 +1194,8 @@ def publish(parent, outdir, prefix="", callbacks=None):
         callbacks.on_publish(child_key, child)
         new_prefix = pathlib.Path(prefix) / child_key
         new_children[child_key] = publish(child, outdir, new_prefix, callbacks)
-    new_parent = parent._replace_children(new_children)
 
-    def keep_non_null_artifacts(k, v):
-        if not isinstance(v, PublishedArtifact):
-            return True
-        else:
-            return v.path is not None
-
-    return filter_nodes(new_parent, keep_non_null_artifacts)
+    return parent._replace_children(new_children)
 
 
 # serialization
@@ -1351,7 +1354,6 @@ def cli(argv=None):
     # the callbacks
 
     class CLIDiscoverCallbacks(DiscoverCallbacks):
-
         def on_publication(self, path):
             print(_header(f"Discovered publication {path}"))
 
@@ -1360,7 +1362,6 @@ def cli(argv=None):
             print(_warning(f"Skipping directory {relpath}"))
 
     class CLIBuildCallbacks(BuildCallbacks):
-
         def on_build(self, key, node):
             if isinstance(node, UnbuiltArtifact):
                 relative_workdir = node.workdir.relative_to(
