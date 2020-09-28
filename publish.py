@@ -1340,12 +1340,11 @@ def cli(argv=None, now=datetime.datetime.now):
         default=None,
         help="artifacts will be built and published only if their key matches this string",
     )
-    parser.add_argument(
-            '--now',
-            )
+    parser.add_argument("--now",)
     args = parser.parse_args(argv)
 
     if args.now is not None:
+
         def now():
             return datetime.datetime.fromisoformat(args.now)
 
