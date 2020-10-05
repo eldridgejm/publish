@@ -1344,9 +1344,15 @@ def cli(argv=None, now=datetime.datetime.now):
     args = parser.parse_args(argv)
 
     if args.now is not None:
+        # if a number is provided, use it as an offset
+        try:
+            n_days = int(args.now)
+            _now = datetime.datetime.now() + datetime.timedelta(days=n_days)
+        except ValueError:
+            _now = datetime.datetime.fromisoformat(args.now)
 
         def now():
-            return datetime.datetime.fromisoformat(args.now)
+            return now
 
     # construct callbacks for printing information to the screen. start with
     # helper functions for formatting terminal output
