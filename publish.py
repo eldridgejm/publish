@@ -1352,7 +1352,10 @@ def cli(argv=None, now=datetime.datetime.now):
             _now = datetime.datetime.fromisoformat(args.now)
 
         def now():
-            return now
+            return _now
+
+    else:
+        now = datetime.datetime.now
 
     # construct callbacks for printing information to the screen. start with
     # helper functions for formatting terminal output
