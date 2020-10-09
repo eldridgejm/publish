@@ -1307,7 +1307,7 @@ def _arg_output_directory(s):
     return _arg_directory(path)
 
 
-def cli(argv=None, now=datetime.datetime.now):
+def cli(argv=None):
     """The command line interface.
 
     Parameters
@@ -1343,8 +1343,9 @@ def cli(argv=None, now=datetime.datetime.now):
     parser.add_argument("--now",)
     args = parser.parse_args(argv)
 
-    if args.now is not None:
-        # if a number is provided, use it as an offset
+    if args.now is None:
+        now = datetime.datetime.now
+    else:
         try:
             n_days = int(args.now)
             _now = datetime.datetime.now() + datetime.timedelta(days=n_days)
@@ -1353,9 +1354,6 @@ def cli(argv=None, now=datetime.datetime.now):
 
         def now():
             return _now
-
-    else:
-        now = datetime.datetime.now
 
     # construct callbacks for printing information to the screen. start with
     # helper functions for formatting terminal output
