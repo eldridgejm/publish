@@ -254,9 +254,9 @@ is run.  is omitted, its value is assumed to be the artifact’s key – for
 instance, <code class="docutils literal notranslate"><span class="pre">homework.pdf</span></code>’s <code class="docutils literal notranslate"><span class="pre">file</span></code> field is simply <code class="docutils literal notranslate"><span class="pre">homework.pdf</span></code>.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">release_time</span></code> field provides the artifact’s release time. It can be a
 specific datetime in ISO 8601 format, like <code class="docutils literal notranslate"><span class="pre">2020-09-18</span> <span class="pre">17:00:00</span></code>, or a
-<em>relative</em> date of the form “&lt;number&gt; days after metadata.&lt;field&gt;”, in which
-case the date will be calculated relative to the metadata field.  The field it
-refers to must be a datetime.</p>
+<em>relative</em> date of the form “&lt;number&gt; (hour|day)[s]{0,1} (before|after)
+metadata.&lt;field&gt;”, in which case the date will be calculated relative to the
+metadata field.  The field it refers to must be a datetime.</p>
 <p>The file hierarchy determines which publications belong to which collections.
 If a publication file is placed in a directory that is a descendent of a
 directory containing a collection file, the publication will be placed in that
@@ -461,7 +461,7 @@ stages of the discover -&gt; build -&gt; publish process. Each are subclasses of
 <code class="xref py py-class docutils literal notranslate"><span class="pre">typing.NamedTuple</span></code>.</p>
 <dl class="py class">
 <dt id="publish.UnbuiltArtifact">
-<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">UnbuiltArtifact</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">workdir</span><span class="p">:</span> <span class="n">pathlib.Path</span></em>, <em class="sig-param"><span class="n">file</span><span class="p">:</span> <span class="n">str</span></em>, <em class="sig-param"><span class="n">recipe</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">release_time</span><span class="p">:</span> <span class="n">datetime.datetime</span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.UnbuiltArtifact" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">UnbuiltArtifact</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">workdir</span><span class="p">:</span> <span class="n">pathlib.Path</span></em>, <em class="sig-param"><span class="n">file</span><span class="p">:</span> <span class="n">str</span></em>, <em class="sig-param"><span class="n">recipe</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">release_time</span><span class="p">:</span> <span class="n">datetime.datetime</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">ready</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.UnbuiltArtifact" title="Permalink to this definition">¶</a></dt>
 <dd><p>The inputs needed to build an artifact.</p>
 <dl class="py attribute">
 <dt id="publish.UnbuiltArtifact.workdir">
@@ -503,6 +503,17 @@ stages of the discover -&gt; build -&gt; publish process. Each are subclasses of
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
 <dd class="field-odd"><p>Union[datetime.datetime, None]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.UnbuiltArtifact.ready">
+<code class="sig-name descname">ready</code><a class="headerlink" href="#publish.UnbuiltArtifact.ready" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether or not the artifact is ready for publication. Default: True.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
 </dd>
 </dl>
 </dd></dl>
@@ -978,6 +989,12 @@ and provide an instance to <a class="reference internal" href="#publish.build" t
 <dt id="publish.BuildCallbacks.on_build">
 <code class="sig-name descname">on_build</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">node</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuildCallbacks.on_build" title="Permalink to this definition">¶</a></dt>
 <dd><p>Called when building a collection/publication/artifact.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.BuildCallbacks.on_not_ready">
+<code class="sig-name descname">on_not_ready</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">artifact</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact">publish.UnbuiltArtifact</a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuildCallbacks.on_not_ready" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called when the artifact is not ready.</p>
 </dd></dl>
 
 <dl class="py method">
