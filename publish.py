@@ -272,6 +272,8 @@ class UnbuiltArtifact(Artifact, typing.NamedTuple):
         Command used to build the artifact. If None, no command is necessary.
     release_time: Union[datetime.datetime, None]
         Time/date the artifact should be made public. If None, it is always available.
+    ready : bool
+        Whether or not the artifact is ready for publication. Default: True.
 
     """
 
@@ -279,6 +281,7 @@ class UnbuiltArtifact(Artifact, typing.NamedTuple):
     file: str
     recipe: str = None
     release_time: datetime.datetime = None
+    ready: bool = True
 
 
 class BuiltArtifact(Artifact, typing.NamedTuple):
@@ -644,13 +647,15 @@ def _parse_release_time(s, metadata):
         return s
 
     short_match = re.match(r"metadata\.(\w+)$", s)
-    long_match = re.match(r"^(\d+) (hour|day)[s]{0,1} (after|before) metadata\.(\w+)$", s)
+    long_match = re.match(
+        r"^(\d+) (hour|day)[s]{0,1} (after|before) metadata\.(\w+)$", s
+    )
 
     if short_match:
         [variable] = short_match.groups()
         factor = 1
         number = 0
-        hours_or_days = 'day'
+        hours_or_days = "day"
     elif long_match:
         number, hours_or_days, before_or_after, variable = long_match.groups()
         factor = -1 if before_or_after == "before" else 1
@@ -662,10 +667,10 @@ def _parse_release_time(s, metadata):
     ):
         raise ValueError(f"Invalid reference variable '{variable}'. Not a datetime.")
 
-    if hours_or_days == 'hour':
-        timedelta_kwargs = {'hours': factor * int(number)}
+    if hours_or_days == "hour":
+        timedelta_kwargs = {"hours": factor * int(number)}
     else:
-        timedelta_kwargs = {'days': factor * int(number)}
+        timedelta_kwargs = {"days": factor * int(number)}
 
     delta = datetime.timedelta(**timedelta_kwargs)
     return metadata[variable] + delta
@@ -710,6 +715,7 @@ def read_publication_file(path):
                 "schema": {
                     "file": {"type": "string", "default": None, "nullable": True},
                     "recipe": {"type": "string", "default": None, "nullable": True},
+                    "ready": {"type": "boolean", "default": True, "nullable": True},
                     "release_time": {
                         "type": ["datetime", "string"],
                         "default": None,
@@ -1000,6 +1006,9 @@ class BuildCallbacks:
     def on_too_soon(self, artifact: UnbuiltArtifact):
         """Called when it is too soon to release the artifact."""
 
+    def on_not_ready(self, artifact: UnbuiltArtifact):
+        """Called when the artifact is not ready."""
+
     def on_recipe(self, artifact: UnbuiltArtifact):
         """Called when artifact is being built using its recipe."""
 
@@ -1042,6 +1051,10 @@ def _build_artifact(
         and artifact.release_time > now()
     ):
         callbacks.on_too_soon(artifact)
+        return output
+
+    if not artifact.ready:
+        callbacks.on_not_ready(artifact)
         return output
 
     if artifact.recipe is None:
@@ -1410,6 +1423,10 @@ def cli(argv=None):
                 f"\tRelease time {artifact.release_time} has not yet been reached. "
                 "Skipping."
             )
+            print(_warning(msg))
+
+        def on_not_ready(self, artifact):
+            msg = f"\tNot ready. Skipping"
             print(_warning(msg))
 
         def on_success(self, output):

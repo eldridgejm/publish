@@ -59,6 +59,29 @@ def test_build_artifact_when_release_time_is_in_future():
     assert not run.called
 
 
+def test_build_artifact_when_not_ready():
+    # given
+    artifact = publish.UnbuiltArtifact(
+        workdir=pathlib.Path.cwd(),
+        file="foo.pdf",
+        recipe="echo hi",
+        release_time=datetime.datetime(2020, 2, 28, 23, 59, 0),
+        ready=False,
+    )
+
+    proc = Mock()
+    proc.returncode = 0
+    run = Mock(return_value=proc)
+    now = Mock(return_value=datetime.datetime(2020, 3, 1, 0, 0, 0))
+
+    # when
+    result = publish.build(artifact, run=run, now=now)
+
+    # then
+    assert not result.is_released
+    assert not run.called
+
+
 def test_build_artifact_when_release_time_is_in_future_ignore_release_time():
     # given
     artifact = publish.UnbuiltArtifact(

@@ -39,6 +39,7 @@ def test_discover_finds_publications():
     assert universe.collections["homeworks"].publications.keys() == {
         "01-intro",
         "02-python",
+        "03-not_ready",
     }
 
 
@@ -90,6 +91,19 @@ def test_discover_loads_dates_as_dates():
     assert isinstance(
         universe.collections["homeworks"].publications["01-intro"].metadata["released"],
         datetime.date,
+    )
+
+
+def test_discover_reads_ready():
+    # when
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
+
+    # then
+    assert (
+        not universe.collections["homeworks"]
+        .publications["03-not_ready"]
+        .artifacts["homework.pdf"]
+        .ready
     )
 
 
@@ -507,7 +521,6 @@ def test_read_publication_with_relative_release_time_after_large(write_file):
     # then
     expected = publication.metadata["due"] + datetime.timedelta(days=11)
     assert publication.artifacts["solution"].release_time == expected
-
 
 
 def test_read_publication_with_relative_release_time_after_large_hours(write_file):
