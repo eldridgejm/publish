@@ -388,7 +388,7 @@ def test_read_publication_with_relative_release_time(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_relative_release_date(write_file):
+def test_read_publication_with_relative_release_date_raises(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -447,6 +447,37 @@ def test_read_publication_with_relative_release_time_after(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
+def test_read_publication_with_relative_release_time_after_hours(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 3 hours after metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] + datetime.timedelta(hours=3)
+    assert publication.artifacts["solution"].release_time == expected
+
+
 def test_read_publication_with_relative_release_time_after_large(write_file):
     # given
     path = write_file(
@@ -478,6 +509,38 @@ def test_read_publication_with_relative_release_time_after_large(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
+
+def test_read_publication_with_relative_release_time_after_large_hours(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 1000 hours after metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] + datetime.timedelta(hours=1000)
+    assert publication.artifacts["solution"].release_time == expected
+
+
 def test_read_publication_with_relative_release_date_before(write_file):
     # given
     path = write_file(
@@ -506,6 +569,37 @@ def test_read_publication_with_relative_release_date_before(write_file):
 
     # then
     expected = publication.metadata["due"] - datetime.timedelta(days=3)
+    assert publication.artifacts["solution"].release_time == expected
+
+
+def test_read_publication_with_relative_release_date_before_hours(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 3 hours before metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] - datetime.timedelta(hours=3)
     assert publication.artifacts["solution"].release_time == expected
 
 

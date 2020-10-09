@@ -111,9 +111,9 @@ instance, ``homework.pdf``'s ``file`` field is simply ``homework.pdf``.
 
 The ``release_time`` field provides the artifact's release time. It can be a
 specific datetime in ISO 8601 format, like ``2020-09-18 17:00:00``, or a
-*relative* date of the form "<number> days after metadata.<field>", in which
-case the date will be calculated relative to the metadata field.  The field it
-refers to must be a datetime.
+*relative* date of the form "<number> (hour|day)[s]{0,1} (before|after)
+metadata.<field>", in which case the date will be calculated relative to the
+metadata field.  The field it refers to must be a datetime.
 
 The file hierarchy determines which publications belong to which collections.
 If a publication file is placed in a directory that is a descendent of a
@@ -618,6 +618,8 @@ def read_collection_file(path):
 
 def _parse_release_time(s, metadata):
     """Convert a string like '1 day after metadata.due' to a datetime.
+
+    Also works with hours: "3 hours after metadata.due"
     
     Parameters
     ----------
@@ -642,14 +644,15 @@ def _parse_release_time(s, metadata):
         return s
 
     short_match = re.match(r"metadata\.(\w+)$", s)
-    long_match = re.match(r"^(\d+) day[s]{0,1} (after|before) metadata\.(\w+)$", s)
+    long_match = re.match(r"^(\d+) (hour|day)[s]{0,1} (after|before) metadata\.(\w+)$", s)
 
     if short_match:
         [variable] = short_match.groups()
         factor = 1
-        days = 0
+        number = 0
+        hours_or_days = 'day'
     elif long_match:
-        days, before_or_after, variable = long_match.groups()
+        number, hours_or_days, before_or_after, variable = long_match.groups()
         factor = -1 if before_or_after == "before" else 1
     else:
         raise ValueError("Invalid relative date string.")
@@ -659,7 +662,12 @@ def _parse_release_time(s, metadata):
     ):
         raise ValueError(f"Invalid reference variable '{variable}'. Not a datetime.")
 
-    delta = datetime.timedelta(days=factor * int(days))
+    if hours_or_days == 'hour':
+        timedelta_kwargs = {'hours': factor * int(number)}
+    else:
+        timedelta_kwargs = {'days': factor * int(number)}
+
+    delta = datetime.timedelta(**timedelta_kwargs)
     return metadata[variable] + delta
 
 
