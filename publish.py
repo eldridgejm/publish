@@ -705,6 +705,11 @@ def read_publication_file(path):
     of metadata. It should also have an "artifacts" key whose value is a
     dictionary mapping artifact names to artifact definitions.
 
+    Optionally, the file can have a "release_time" key providing a time at
+    which the publication should be considered released. It may also have
+    a "ready" key; if this is False, the publication will not be considered
+    released.
+
     Only very basic validation is performed by this function. Namely, the
     metadata schema and required/optional artifacts are not enforced. See the
     :func:`validate` function for validating these aspects of the publication.
@@ -1067,9 +1072,7 @@ def _build_artifact(
         A summary of the build results.
 
     """
-    output = BuiltArtifact(
-        workdir=artifact.workdir, file=artifact.file
-    )
+    output = BuiltArtifact(workdir=artifact.workdir, file=artifact.file)
 
     if (
         not ignore_release_time
@@ -1110,9 +1113,7 @@ def _build_artifact(
     if not exists(filepath):
         raise BuildError(f"Artifact file {filepath} does not exist.")
 
-    output = output._replace(
-        returncode=returncode, stdout=stdout, stderr=stderr
-    )
+    output = output._replace(returncode=returncode, stdout=stdout, stderr=stderr)
     callbacks.on_success(output)
     return output
 
@@ -1144,9 +1145,19 @@ def build(
 
     Returns
     -------
-    type(parent)
+    Optional[type(parent)]
         A copy of the parent where each leaf artifact is replaced with
-        an instance of :class:`BuiltArtifact`.
+        an instance of :class:`BuiltArtifact`. If the thing to be built is not
+        built due to being unreleased, ``None`` is returned.
+
+    Note
+    ----
+    If a publication or artifact is not yet released, either due to its release
+    time being in the future or because it is marked as not ready, its recipe will
+    not be run. If the parent node is a publication or artifact that is not
+    built, the result of this function is None. If the parent node is a collection
+    or universe, all of the unbuilt publications and artifacts within are
+    recursively removed from the tree.
 
     """
     if callbacks is None:
@@ -1455,20 +1466,29 @@ def cli(argv=None):
                 relative_workdir = node.workdir.relative_to(
                     args.input_directory.absolute()
                 )
-                print(_header(f"Building {relative_workdir}/{key}"))
+                print(_header(f"    Building artifact {relative_workdir}/{key}"))
+            elif isinstance(node, Publication):
+                print(_header(f"Building publication {key}"))
 
-        def on_recipe(self, artifact):
-            print(_body(f'\tExecuting "{artifact.recipe}"'))
+        def on_too_soon(self, node):
+            if isinstance(node, UnbuiltArtifact):
+                tabs = '    '
+            else:
+                tabs = ''
 
-        def on_too_soon(self, artifact):
             msg = (
-                f"\tRelease time {artifact.release_time} has not yet been reached. "
+                f"{tabs}Release time {node.release_time} has not yet been reached. "
                 "Skipping."
             )
             print(_warning(msg))
 
-        def on_not_ready(self, artifact):
-            msg = f"\tNot ready. Skipping"
+        def on_not_ready(self, node):
+            if isinstance(node, UnbuiltArtifact):
+                tabs = '\t'
+            else:
+                tabs = ''
+
+            msg = f"{tabs}Not ready. Skipping"
             print(_warning(msg))
 
         def on_success(self, output):

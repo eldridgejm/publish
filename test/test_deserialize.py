@@ -38,11 +38,7 @@ def test_serialize_deserialize_built_publication_roundtrip():
             "due": datetime.datetime(2020, 2, 28, 23, 59, 0),
             "released": datetime.date(2020, 2, 28),
         },
-        artifacts={
-            "homework": publish.BuiltArtifact(
-                workdir=None, file="foo/bar"
-            )
-        },
+        artifacts={"homework": publish.BuiltArtifact(workdir=None, file="foo/bar")},
     )
 
     # when
