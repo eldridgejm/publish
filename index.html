@@ -187,7 +187,8 @@ a collection. Each publication within the collection is an individual
 homework. Each publication may have several artifacts, such as the PDF of the
 problem set, the PDF of the solutions, and a .zip containing the homework’s
 data.</p>
-<p>An artifact may have a <strong>release time</strong>, before which it will not be built or published.</p>
+<p>An artifact may have a <strong>release time</strong>, before which it will not be built or published.
+Likewise, entire publications can have release times, too.</p>
 </div>
 <div class="section" id="discovering-building-and-publishing">
 <h2>Discovering, Building, and Publishing<a class="headerlink" href="#discovering-building-and-publishing" title="Permalink to this headline">¶</a></h2>
@@ -247,6 +248,7 @@ along with metadata:</p>
         <span class="nt">file</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">./build/solution.pdf</span>
         <span class="nt">recipe</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">make solution</span>
         <span class="nt">release_time</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1 day after metadata.due</span>
+        <span class="nt">ready</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">false</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">file</span></code> field tells <em>publish</em> where the file will appear when the recipe
@@ -257,6 +259,14 @@ specific datetime in ISO 8601 format, like <code class="docutils literal notrans
 <em>relative</em> date of the form “&lt;number&gt; (hour|day)[s]{0,1} (before|after)
 metadata.&lt;field&gt;”, in which case the date will be calculated relative to the
 metadata field.  The field it refers to must be a datetime.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">ready</span></code> field is a manual override which prevents the artifact from
+being built and published before it is ready. If not provided, the artifact
+is assumed to be ready.</p>
+<p>Publications may also have <code class="docutils literal notranslate"><span class="pre">release_time</span></code> and <code class="docutils literal notranslate"><span class="pre">ready</span></code> attributes. If these
+are provided they will take precedence over the attributes of an individual
+artifact in the publication. The release time of the publication can be used
+to control when its metadata becomes available – before the release time,
+the publication in effect does not exist.</p>
 <p>The file hierarchy determines which publications belong to which collections.
 If a publication file is placed in a directory that is a descendent of a
 directory containing a collection file, the publication will be placed in that
@@ -288,10 +298,11 @@ the artifact file is missing after the recipe is run.</p>
 </div>
 <div class="section" id="publishing">
 <h3>Publishing<a class="headerlink" href="#publishing" title="Permalink to this headline">¶</a></h3>
-<p>In the publish phase, all artifacts whose release date has passed are copied to
-an <strong>output directory</strong>. Additionally, a JSON file containing information about
-the collection -&gt; publication -&gt; artifact hierarchy is placed at the root of
-the output directory.</p>
+<p>In the publish phase, all published artifacts – that is, those which are ready
+and whose release date has passed – are copied to an <strong>output directory</strong>.
+Additionally, a JSON file containing information about the collection -&gt;
+publication -&gt; artifact hierarchy is placed at the root of the output
+directory.</p>
 <p>Artifacts are copied to a location within the output directory according to the
 following “formula”:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&lt;output_directory&gt;/&lt;collection_key&gt;/&lt;publication_key&gt;/&lt;artifact_key&gt;
@@ -317,12 +328,9 @@ artifact relative to the output directory, as well as a publication’s metadata
 <span class="go">2020-09-10 23:59:00</span>
 </pre></div>
 </div>
-<p>Artifacts which are defined but not yet released still appear in this dictionary, but
-their path attribute is set to <code class="docutils literal notranslate"><span class="pre">None</span></code>. For instance:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;collections&#39;</span><span class="p">][</span><span class="s1">&#39;homeworks&#39;</span><span class="p">][</span><span class="s1">&#39;publications&#39;</span><span class="p">][</span><span class="s1">&#39;01-intro&#39;</span><span class="p">][</span><span class="s1">&#39;artifacts&#39;</span><span class="p">][</span><span class="s1">&#39;solution.pdf&#39;</span><span class="p">][</span><span class="s1">&#39;path&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span>
-<span class="go">True</span>
-</pre></div>
-</div>
+<p>Only those publications and artifacts which have been published appear in the
+JSON file. In particular, if an artifact has not reached its release time, it
+will be missing from the JSON representation entirely.</p>
 </div>
 </div>
 </div>
@@ -370,7 +378,7 @@ publications, and artifacts as well, as described below.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnbuiltArtifact</span></code></a>(workdir, file, recipe, …)</p></td>
 <td><p>The inputs needed to build an artifact.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>(workdir, file, is_released, …)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>(workdir, file, returncode, …)</p></td>
 <td><p>The results of building an artifact.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#publish.PublishedArtifact" title="publish.PublishedArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PublishedArtifact</span></code></a>(path)</p></td>
@@ -439,7 +447,7 @@ and artifacts.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UnbuiltArtifact</span></code></a>(workdir, file, recipe, …)</p></td>
 <td><p>The inputs needed to build an artifact.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>(workdir, file, is_released, …)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>(workdir, file, returncode, …)</p></td>
 <td><p>The results of building an artifact.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#publish.PublishedArtifact" title="publish.PublishedArtifact"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PublishedArtifact</span></code></a>(path)</p></td>
@@ -522,7 +530,7 @@ stages of the discover -&gt; build -&gt; publish process. Each are subclasses of
 
 <dl class="py class">
 <dt id="publish.BuiltArtifact">
-<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">BuiltArtifact</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">workdir</span><span class="p">:</span> <span class="n">pathlib.Path</span></em>, <em class="sig-param"><span class="n">file</span><span class="p">:</span> <span class="n">str</span></em>, <em class="sig-param"><span class="n">is_released</span><span class="p">:</span> <span class="n">bool</span></em>, <em class="sig-param"><span class="n">returncode</span><span class="p">:</span> <span class="n">int</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">stdout</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">stderr</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuiltArtifact" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">BuiltArtifact</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">workdir</span><span class="p">:</span> <span class="n">pathlib.Path</span></em>, <em class="sig-param"><span class="n">file</span><span class="p">:</span> <span class="n">str</span></em>, <em class="sig-param"><span class="n">returncode</span><span class="p">:</span> <span class="n">int</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">stdout</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em>, <em class="sig-param"><span class="n">stderr</span><span class="p">:</span> <span class="n">str</span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuiltArtifact" title="Permalink to this definition">¶</a></dt>
 <dd><p>The results of building an artifact.</p>
 <dl class="py attribute">
 <dt id="publish.BuiltArtifact.workdir">
@@ -542,17 +550,6 @@ stages of the discover -&gt; build -&gt; publish process. Each are subclasses of
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
 <dd class="field-odd"><p>str</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt id="publish.BuiltArtifact.is_released">
-<code class="sig-name descname">is_released</code><a class="headerlink" href="#publish.BuiltArtifact.is_released" title="Permalink to this definition">¶</a></dt>
-<dd><p>Whether or not the artifact’s release time has passed.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>bool</p>
 </dd>
 </dl>
 </dd></dl>
@@ -618,7 +615,7 @@ with the <a class="reference internal" href="#publish.Universe" title="publish.U
 <code class="xref py py-class docutils literal notranslate"><span class="pre">typing.NamedTuple</span></code>.</p>
 <dl class="py class">
 <dt id="publish.Publication">
-<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">Publication</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">metadata</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span>Any<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">artifacts</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span>publish.Artifact<span class="p">]</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.Publication" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">publish.</code><code class="sig-name descname">Publication</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">metadata</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span>Any<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">artifacts</span><span class="p">:</span> <span class="n">Mapping<span class="p">[</span>str<span class="p">, </span>publish.Artifact<span class="p">]</span></span></em>, <em class="sig-param"><span class="n">ready</span><span class="p">:</span> <span class="n">bool</span> <span class="o">=</span> <span class="default_value">True</span></em>, <em class="sig-param"><span class="n">release_time</span><span class="p">:</span> <span class="n">datetime.datetime</span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.Publication" title="Permalink to this definition">¶</a></dt>
 <dd><p>A publication.</p>
 <dl class="py attribute">
 <dt id="publish.Publication.artifacts">
@@ -941,6 +938,10 @@ Default: False.</p>
 <p>The file should have a “metadata” key whose value is a dictionary
 of metadata. It should also have an “artifacts” key whose value is a
 dictionary mapping artifact names to artifact definitions.</p>
+<p>Optionally, the file can have a “release_time” key providing a time at
+which the publication should be considered released. It may also have
+a “ready” key; if this is False, the publication will not be considered
+released.</p>
 <p>Only very basic validation is performed by this function. Namely, the
 metadata schema and required/optional artifacts are not enforced. See the
 <a class="reference internal" href="#publish.validate" title="publish.validate"><code class="xref py py-func docutils literal notranslate"><span class="pre">validate()</span></code></a> function for validating these aspects of the publication.</p>
@@ -970,12 +971,22 @@ and their arguments.</p></li>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>A copy of the parent where each leaf artifact is replaced with
-an instance of <a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-class docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>.</p>
+an instance of <a class="reference internal" href="#publish.BuiltArtifact" title="publish.BuiltArtifact"><code class="xref py py-class docutils literal notranslate"><span class="pre">BuiltArtifact</span></code></a>. If the thing to be built is not
+built due to being unreleased, <code class="docutils literal notranslate"><span class="pre">None</span></code> is returned.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>type(parent)</p>
+<dd class="field-odd"><p>Optional[type(parent)]</p>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If a publication or artifact is not yet released, either due to its release
+time being in the future or because it is marked as not ready, its recipe will
+not be run. If the parent node is a publication or artifact that is not
+built, the result of this function is None. If the parent node is a collection
+or universe, all of the unbuilt publications and artifacts within are
+recursively removed from the tree.</p>
+</div>
 </dd></dl>
 
 <p>Callbacks are invoked at certain points during the build. To provide callbacks
