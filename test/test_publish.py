@@ -32,7 +32,7 @@ def test_publish(example_1, outdir):
 
     # then
     assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
-    assert (outdir / "homeworks" / "02-python" / "solution.pdf").exists()
+    assert not (outdir / "homeworks" / "02-python" / "solution.pdf").exists()
 
     assert (
         "homework.pdf"
@@ -40,13 +40,11 @@ def test_publish(example_1, outdir):
     )
 
 
-def test_publish_even_if_not_released(example_1, outdir):
+def test_artifact_not_included_if_not_released(example_1, outdir):
     # given
     discovered = publish.discover(example_1)
     built = publish.build(discovered)
     publication = built.collections["homeworks"].publications["02-python"]
-    new = publication.artifacts["solution.pdf"]._replace(is_released=False)
-    publication.artifacts["solution.pdf"] = new
 
     # when
     published = publish.publish(built, outdir)
@@ -55,10 +53,4 @@ def test_publish_even_if_not_released(example_1, outdir):
     assert (outdir / "homeworks" / "01-intro" / "homework.pdf").exists()
     assert not (outdir / "homeworks" / "02-python" / "solution.pdf").exists()
 
-    assert (
-        published.collections["homeworks"]
-        .publications["02-python"]
-        .artifacts["solution.pdf"]
-        .path
-        is None
-    )
+    assert "solution.pdf" not in (publication.artifacts)

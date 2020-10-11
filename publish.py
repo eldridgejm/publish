@@ -30,6 +30,7 @@ problem set, the PDF of the solutions, and a .zip containing the homework's
 data.
 
 An artifact may have a **release time**, before which it will not be built or published.
+Likewise, entire publications can have release times, too.
 
 Discovering, Building, and Publishing
 -------------------------------------
@@ -104,6 +105,7 @@ along with metadata:
             file: ./build/solution.pdf
             recipe: make solution
             release_time: 1 day after metadata.due
+            ready: false
 
 The ``file`` field tells *publish* where the file will appear when the recipe
 is run.  is omitted, its value is assumed to be the artifact's key -- for
@@ -114,6 +116,16 @@ specific datetime in ISO 8601 format, like ``2020-09-18 17:00:00``, or a
 *relative* date of the form "<number> (hour|day)[s]{0,1} (before|after)
 metadata.<field>", in which case the date will be calculated relative to the
 metadata field.  The field it refers to must be a datetime.
+
+The ``ready`` field is a manual override which prevents the artifact from
+being built and published before it is ready. If not provided, the artifact
+is assumed to be ready.
+
+Publications may also have ``release_time`` and ``ready`` attributes. If these
+are provided they will take precedence over the attributes of an individual
+artifact in the publication. The release time of the publication can be used
+to control when its metadata becomes available -- before the release time,
+the publication in effect does not exist.
 
 The file hierarchy determines which publications belong to which collections.
 If a publication file is placed in a directory that is a descendent of a
@@ -153,10 +165,11 @@ the artifact file is missing after the recipe is run.
 Publishing
 ~~~~~~~~~~
 
-In the publish phase, all artifacts whose release date has passed are copied to
-an **output directory**. Additionally, a JSON file containing information about
-the collection -> publication -> artifact hierarchy is placed at the root of
-the output directory.
+In the publish phase, all published artifacts -- that is, those which are ready
+and whose release date has passed -- are copied to an **output directory**.
+Additionally, a JSON file containing information about the collection ->
+publication -> artifact hierarchy is placed at the root of the output
+directory.
 
 Artifacts are copied to a location within the output directory according to the
 following "formula":
@@ -175,7 +188,7 @@ artifact file exists.
 
 *publish* will create a JSON file named ``<output_directory>/published.json``.
 This file contains nested dictionaries describing the structure of the
-collection -> publication -> artifact hierarchy.
+collection -> publication -> artifact hierarchy. 
 
 For example, the below code will load the JSON file and print the path of a published
 artifact relative to the output directory, as well as a publication's metadata.
@@ -189,13 +202,9 @@ artifact relative to the output directory, as well as a publication's metadata.
     >>> d['collections']['homeworks']['publications']['01-intro']['metadata']['due']
     2020-09-10 23:59:00
 
-Artifacts which are defined but not yet released still appear in this dictionary, but
-their path attribute is set to ``None``. For instance:
-
-.. code-block:: python
-
-    >>> d['collections']['homeworks']['publications']['01-intro']['artifacts']['solution.pdf']['path'] is None
-    True
+Only those publications and artifacts which have been published appear in the
+JSON file. In particular, if an artifact has not reached its release time, it
+will be missing from the JSON representation entirely.
 
 """
 
@@ -293,8 +302,6 @@ class BuiltArtifact(Artifact, typing.NamedTuple):
         Absolute path to the working directory used to build the artifact.
     file : str
         Path (relative to the workdir) of the file produced by the build.
-    is_released : bool
-        Whether or not the artifact's release time has passed.
     returncode : int
         The build process's return code. If None, there was no process.
     stdout : str
@@ -306,7 +313,6 @@ class BuiltArtifact(Artifact, typing.NamedTuple):
 
     workdir: pathlib.Path
     file: str
-    is_released: bool
     returncode: int = None
     stdout: str = None
     stderr: str = None
@@ -356,6 +362,8 @@ class Publication(typing.NamedTuple):
 
     metadata: typing.Mapping[str, typing.Any]
     artifacts: typing.Mapping[str, Artifact]
+    ready: bool = True
+    release_time: datetime.datetime = None
 
     def _deep_asdict(self):
         """A dictionary representation of the publication and its children."""
@@ -628,7 +636,8 @@ def _parse_release_time(s, metadata):
     ----------
     s
         A time, maybe in the format of a string, but also possibly None or a datetime.
-        If it isn't a string, the function does nothing.
+        If it isn't a string, the function simply returns s. This is useful if
+        s is None, for instance.
     metadata : dict
         The metadata dictionary used to look up the reference date.
 
@@ -708,6 +717,12 @@ def read_publication_file(path):
     # we'll just do a quick check of the file structure first. validating the metadata
     # schema and checking that the right artifacts are provided will be done later
     schema = {
+        "ready": {"type": "boolean", "default": True, "nullable": True},
+        "release_time": {
+            "type": ["datetime", "string"],
+            "default": None,
+            "nullable": True,
+        },
         "metadata": {"type": "dict", "required": False, "default": {}},
         "artifacts": {
             "required": True,
@@ -752,7 +767,18 @@ def read_publication_file(path):
 
         artifacts[key] = UnbuiltArtifact(workdir=path.parent.absolute(), **definition)
 
-    return Publication(metadata=metadata, artifacts=artifacts)
+    # handle publication release time
+    try:
+        release_time = _parse_release_time(validated["release_time"], metadata)
+    except ValueError as exc:
+        raise DiscoveryError(str(exc), path)
+
+    return Publication(
+        metadata=metadata,
+        artifacts=artifacts,
+        ready=validated["ready"],
+        release_time=release_time,
+    )
 
 
 # discovery: discover()
@@ -1037,12 +1063,12 @@ def _build_artifact(
 
     Returns
     -------
-    BuiltArtifact
+    Optional[BuiltArtifact]
         A summary of the build results.
 
     """
     output = BuiltArtifact(
-        workdir=artifact.workdir, file=artifact.file, is_released=False
+        workdir=artifact.workdir, file=artifact.file
     )
 
     if (
@@ -1051,11 +1077,11 @@ def _build_artifact(
         and artifact.release_time > now()
     ):
         callbacks.on_too_soon(artifact)
-        return output
+        return None
 
     if not artifact.ready:
         callbacks.on_not_ready(artifact)
-        return output
+        return None
 
     if artifact.recipe is None:
         stdout = None
@@ -1085,7 +1111,7 @@ def _build_artifact(
         raise BuildError(f"Artifact file {filepath} does not exist.")
 
     output = output._replace(
-        is_released=True, returncode=returncode, stdout=stdout, stderr=stderr
+        returncode=returncode, stdout=stdout, stderr=stderr
     )
     callbacks.on_success(output)
     return output
@@ -1137,10 +1163,29 @@ def build(
     if isinstance(parent, UnbuiltArtifact):
         return _build_artifact(parent, **kwargs)
 
+    if isinstance(parent, Publication):
+        if not parent.ready:
+            callbacks.on_not_ready(parent)
+            return None
+
+        if (
+            not ignore_release_time
+            and parent.release_time is not None
+            and parent.release_time > now()
+        ):
+            callbacks.on_too_soon(parent)
+            return None
+
+    # recursively build the children
     new_children = {}
     for child_key, child in parent._children.items():
         callbacks.on_build(child_key, child)
-        new_children[child_key] = build(child, **kwargs)
+        result = build(child, **kwargs)
+        # if a node is not built (perhaps due to it not being ready), the
+        # result is None. this next conditional prevents such nodes from
+        # appearing in the tree
+        if result is not None:
+            new_children[child_key] = result
     return parent._replace_children(new_children)
 
 
@@ -1157,9 +1202,6 @@ class PublishCallbacks:
 
 
 def _publish_artifact(built_artifact, outdir, filename, callbacks):
-
-    if not built_artifact.is_released:
-        return PublishedArtifact(None)
 
     # actually copy the artifact
     full_dst = outdir / filename

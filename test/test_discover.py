@@ -40,6 +40,7 @@ def test_discover_finds_publications():
         "01-intro",
         "02-python",
         "03-not_ready",
+        "04-publication_not_released",
     }
 
 
@@ -371,7 +372,70 @@ def test_read_publication_example(write_file):
     assert publication.artifacts["homework"].recipe == "make homework"
 
 
+def test_read_publication_without_release_time(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    assert publication.release_time is None
+
+
 def test_read_publication_with_relative_release_time(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-04 23:59:00
+                released: 2020-09-01
+
+            release_time: 1 day after metadata.due
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: metadata.due
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = publication.metadata["due"] + datetime.timedelta(days=1)
+    assert publication.release_time == expected
+
+
+def test_read_artifact_with_relative_release_time(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -402,7 +466,7 @@ def test_read_publication_with_relative_release_time(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_relative_release_date_raises(write_file):
+def test_read_artifact_with_relative_release_date_raises(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -430,7 +494,7 @@ def test_read_publication_with_relative_release_date_raises(write_file):
         publication = publish.read_publication_file(path)
 
 
-def test_read_publication_with_relative_release_time_after(write_file):
+def test_read_artifact_with_relative_release_time_after(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -461,7 +525,7 @@ def test_read_publication_with_relative_release_time_after(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_relative_release_time_after_hours(write_file):
+def test_read_artifact_with_relative_release_time_after_hours(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -492,7 +556,7 @@ def test_read_publication_with_relative_release_time_after_hours(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_relative_release_time_after_large(write_file):
+def test_read_artifact_with_relative_release_time_after_large(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -523,7 +587,7 @@ def test_read_publication_with_relative_release_time_after_large(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_relative_release_time_after_large_hours(write_file):
+def test_read_artifact_with_relative_release_time_after_large_hours(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -554,7 +618,7 @@ def test_read_publication_with_relative_release_time_after_large_hours(write_fil
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_relative_release_date_before(write_file):
+def test_read_artifact_with_relative_release_date_before(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -585,7 +649,7 @@ def test_read_publication_with_relative_release_date_before(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_relative_release_date_before_hours(write_file):
+def test_read_artifact_with_relative_release_date_before_hours(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -616,7 +680,7 @@ def test_read_publication_with_relative_release_date_before_hours(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_relative_release_time_multiple_days(write_file):
+def test_read_artifact_with_relative_release_time_multiple_days(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -647,7 +711,7 @@ def test_read_publication_with_relative_release_time_multiple_days(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_publication_with_invalid_relative_date_raises(write_file):
+def test_read_artifact_with_invalid_relative_date_raises(write_file):
     # given
     path = write_file(
         "publish.yaml",
@@ -675,7 +739,7 @@ def test_read_publication_with_invalid_relative_date_raises(write_file):
         publication = publish.read_publication_file(path)
 
 
-def test_read_publication_with_invalid_relative_date_variable_reference_raises(
+def test_read_artifact_with_invalid_relative_date_variable_reference_raises(
     write_file,
 ):
     # given
@@ -705,7 +769,7 @@ def test_read_publication_with_invalid_relative_date_variable_reference_raises(
         publication = publish.read_publication_file(path)
 
 
-def test_read_publication_with_absolute_release_time(write_file):
+def test_read_artifact_with_absolute_release_time(write_file):
     # given
     path = write_file(
         "publish.yaml",

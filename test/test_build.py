@@ -34,7 +34,7 @@ def test_build_artifact_integration(example_1):
     assert (example_1 / "homeworks" / "01-intro" / "solution.pdf").exists()
     assert result.workdir == artifact.workdir
     assert result.file == artifact.file
-    assert result.is_released == True
+    assert result.file
 
 
 def test_build_artifact_when_release_time_is_in_future():
@@ -55,7 +55,7 @@ def test_build_artifact_when_release_time_is_in_future():
     result = publish.build(artifact, run=run, now=now)
 
     # then
-    assert not result.is_released
+    assert result is None
     assert not run.called
 
 
@@ -78,7 +78,56 @@ def test_build_artifact_when_not_ready():
     result = publish.build(artifact, run=run, now=now)
 
     # then
-    assert not result.is_released
+    assert result is None
+    assert not run.called
+
+
+def test_build_publications_when_not_ready():
+    # given
+    artifact = publish.UnbuiltArtifact(
+        workdir=pathlib.Path.cwd(), file="foo.pdf", recipe="echo hi", ready=True,
+    )
+
+    publication = publish.Publication(
+        metadata={}, artifacts={"homework.pdf": artifact}, ready=False
+    )
+
+    proc = Mock()
+    proc.returncode = 0
+    run = Mock(return_value=proc)
+    now = Mock(return_value=datetime.datetime(2020, 3, 1, 0, 0, 0))
+
+    # when
+    result = publish.build(publication, run=run, now=now)
+
+    # then
+    assert result is None
+    assert not run.called
+
+
+def test_build_publication_when_release_time_in_future():
+    # given
+    artifact = publish.UnbuiltArtifact(
+        workdir=pathlib.Path.cwd(), file="foo.pdf", recipe="echo hi", ready=True,
+    )
+
+    publication = publish.Publication(
+        metadata={},
+        artifacts={"homework.pdf": artifact},
+        ready=True,
+        release_time=datetime.datetime(2020, 4, 1, 0, 0, 0),
+    )
+
+    proc = Mock()
+    proc.returncode = 0
+    run = Mock(return_value=proc)
+    now = Mock(return_value=datetime.datetime(2020, 3, 1, 0, 0, 0))
+
+    # when
+    result = publish.build(publication, run=run, now=now)
+
+    # then
+    assert result is None
     assert not run.called
 
 
@@ -103,7 +152,7 @@ def test_build_artifact_when_release_time_is_in_future_ignore_release_time():
     )
 
     # then
-    assert result.is_released
+    assert result.file
     assert run.called
 
 
@@ -120,7 +169,7 @@ def test_build_artifact_when_recipe_is_none():
     result = publish.build(artifact, run=run, exists=exists)
 
     # then
-    assert result.is_released
+    assert result.file
     assert not run.called
 
 
@@ -166,14 +215,28 @@ def test_build_collection(example_1):
         .publications["01-intro"]
         .artifacts["solution.pdf"]
     )
-    assert build_result.is_released
+    assert build_result.file
     assert (
         built_universe.collections["homeworks"]
         .publications["01-intro"]
         .artifacts["solution.pdf"]
-        .is_released
+        .file
     )
 
     # check that a deep copy is made
     del universe.collections["homeworks"]
     assert "homeworks" in built_universe.collections
+
+    # check that artifacts that have not been released are not built
+    assert (
+        "solution.pdf"
+        not in built_universe.collections["homeworks"]
+        .publications["02-python"]
+        .artifacts
+    )
+
+    # check that publications that have not been released are not build
+    assert (
+        "04-publication_not_released"
+        not in built_universe.collections["homeworks"].publications
+    )

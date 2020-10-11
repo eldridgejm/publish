@@ -40,7 +40,7 @@ def test_serialize_deserialize_built_publication_roundtrip():
         },
         artifacts={
             "homework": publish.BuiltArtifact(
-                workdir=None, file="foo/bar", is_released=False
+                workdir=None, file="foo/bar"
             )
         },
     )
