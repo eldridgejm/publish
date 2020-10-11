@@ -1472,9 +1472,9 @@ def cli(argv=None):
 
         def on_too_soon(self, node):
             if isinstance(node, UnbuiltArtifact):
-                tabs = '    '
+                tabs = "    "
             else:
-                tabs = ''
+                tabs = ""
 
             msg = (
                 f"{tabs}Release time {node.release_time} has not yet been reached. "
@@ -1484,9 +1484,9 @@ def cli(argv=None):
 
         def on_not_ready(self, node):
             if isinstance(node, UnbuiltArtifact):
-                tabs = '\t'
+                tabs = "\t"
             else:
-                tabs = ''
+                tabs = ""
 
             msg = f"{tabs}Not ready. Skipping"
             print(_warning(msg))
