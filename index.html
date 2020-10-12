@@ -414,7 +414,7 @@ publications, and artifacts as well, as described below.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#publish.discover" title="publish.discover"><code class="xref py py-obj docutils literal notranslate"><span class="pre">discover</span></code></a>(input_directory[, …])</p></td>
 <td><p>Discover the collections and publications in the filesystem.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#publish.filter_nodes" title="publish.filter_nodes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_nodes</span></code></a>(parent, predicate[, callbacks])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#publish.filter_nodes" title="publish.filter_nodes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filter_nodes</span></code></a>(parent, predicate[, …])</p></td>
 <td><p>Remove nodes from a Universe/Collection/Publication.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#publish.publish" title="publish.publish"><code class="xref py py-obj docutils literal notranslate"><span class="pre">publish</span></code></a>(parent, outdir[, prefix, callbacks])</p></td>
@@ -1130,7 +1130,7 @@ from JSON.</p>
 <a class="reference internal" href="#publish.filter_nodes" title="publish.filter_nodes"><code class="xref py py-func docutils literal notranslate"><span class="pre">filter_nodes()</span></code></a>.</p>
 <dl class="py function">
 <dt id="publish.filter_nodes">
-<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">filter_nodes</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">parent</span></em>, <em class="sig-param"><span class="n">predicate</span></em>, <em class="sig-param"><span class="n">callbacks</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.filter_nodes" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">publish.</code><code class="sig-name descname">filter_nodes</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">parent</span></em>, <em class="sig-param"><span class="n">predicate</span></em>, <em class="sig-param"><span class="n">remove_empty_nodes</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">callbacks</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.filter_nodes" title="Permalink to this definition">¶</a></dt>
 <dd><p>Remove nodes from a Universe/Collection/Publication.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -1138,6 +1138,8 @@ from JSON.</p>
 <li><p><strong>parent</strong> – The root of the tree.</p></li>
 <li><p><strong>predicate</strong> (<em>Callable</em><em>[</em><em>[</em><em>node</em><em>]</em><em>, </em><em>bool</em><em>]</em>) – A function which takes in a node and returns True/False whether it
 should be kept.</p></li>
+<li><p><strong>remove_empty_nodes</strong> (<em>bool</em>) – Whether nodes without children should be removed (True) or preserved
+(False). Default: False.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
