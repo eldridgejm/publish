@@ -985,7 +985,7 @@ class FilterCallbacks:
         """On an artifact miss."""
 
 
-def filter_nodes(parent, predicate, callbacks=None):
+def filter_nodes(parent, predicate, remove_empty_nodes=False, callbacks=None):
     """Remove nodes from a Universe/Collection/Publication.
 
     Parameters
@@ -995,6 +995,9 @@ def filter_nodes(parent, predicate, callbacks=None):
     predicate : Callable[[node], bool]
         A function which takes in a node and returns True/False whether it
         should be kept.
+    remove_empty_nodes : bool
+        Whether nodes without children should be removed (True) or preserved
+        (False). Default: False.
     
     Returns
     -------
@@ -1012,11 +1015,13 @@ def filter_nodes(parent, predicate, callbacks=None):
 
     new_children = {}
     for child_key, child in parent._children.items():
-        new_child = filter_nodes(child, predicate)
+        new_child = filter_nodes(
+            child, predicate, remove_empty_nodes=remove_empty_nodes, callbacks=callbacks
+        )
         is_artifact = isinstance(
             new_child, (UnbuiltArtifact, BuiltArtifact, PublishedArtifact)
         )
-        if is_artifact or new_child._children:
+        if is_artifact or (not remove_empty_nodes) or new_child._children:
             new_children[child_key] = new_child
 
     new_children = {k: v for (k, v) in new_children.items() if predicate(k, v)}
@@ -1534,7 +1539,9 @@ def cli(argv=None):
             else:
                 return k == args.artifact_filter
 
-        discovered = filter_nodes(discovered, keep, callbacks=CLIFilterCallbacks())
+        discovered = filter_nodes(
+            discovered, keep, remove_empty_nodes=True, callbacks=CLIFilterCallbacks()
+        )
 
     built = build(
         discovered,

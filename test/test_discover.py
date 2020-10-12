@@ -155,7 +155,7 @@ def test_discover_without_file_uses_key():
     )
 
 
-def test_discover_filter_artifacts():
+def test_filter_artifacts():
     # when
     universe = publish.discover(EXAMPLE_1_DIRECTORY)
 
@@ -176,6 +176,38 @@ def test_discover_filter_artifacts():
         "solution.pdf"
         in universe.collections["homeworks"].publications["01-intro"].artifacts
     )
+
+
+def test_filter_artifacts_removes_nodes_without_children():
+    # when
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
+
+    def keep(k, v):
+        if not isinstance(v, publish.UnbuiltArtifact):
+            return True
+
+        return k not in {"solution.pdf", "homework.pdf"}
+
+    universe = publish.filter_nodes(universe, keep, remove_empty_nodes=True)
+
+    # then
+    assert "homeworks" not in universe.collections
+
+
+def test_filter_artifacts_preserves_nodes_without_children_by_default():
+    # when
+    universe = publish.discover(EXAMPLE_1_DIRECTORY)
+
+    def keep(k, v):
+        if not isinstance(v, publish.UnbuiltArtifact):
+            return True
+
+        return k not in {"solution.pdf", "homework.pdf"}
+
+    universe = publish.filter_nodes(universe, keep)
+
+    # then
+    assert "homeworks" in universe.collections
 
 
 # read_collection_file
