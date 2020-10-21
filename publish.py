@@ -1057,6 +1057,7 @@ def _build_artifact(
     *,
     ignore_release_time=False,
     now=datetime.datetime.now,
+    verbose=False,
     run=subprocess.run,
     exists=pathlib.Path.exists,
     callbacks=BuildCallbacks(),
@@ -1100,19 +1101,22 @@ def _build_artifact(
 
         kwargs = {
             "cwd": artifact.workdir,
-            "stdout": subprocess.PIPE,
-            "stderr": subprocess.PIPE,
         }
+        if not verbose:
+            kwargs["stdout"] = subprocess.PIPE
+            kwargs["stderr"] = subprocess.PIPE
+
         proc = run(artifact.recipe, shell=True, **kwargs)
 
         if proc.returncode:
-            msg = "There was a problem while building the artifact: "
-            msg += f"\n{proc.stderr.decode()}"
+            msg = "There was a problem while building the artifact"
+            if proc.stderr is not None:
+                msg += f":\n{proc.stderr.decode()}"
             raise BuildError(msg)
 
         returncode = proc.returncode
-        stdout = proc.stdout.decode()
-        stderr = proc.stderr.decode()
+        stdout = None if proc.stdout is None else proc.stdout.decode()
+        stderr = None if proc.stderr is None else proc.stderr.decode()
 
     filepath = artifact.workdir / artifact.file
     if not exists(filepath):
@@ -1127,6 +1131,7 @@ def build(
     parent: typing.Union[Universe, Collection, Publication, UnbuiltArtifact],
     *,
     ignore_release_time=False,
+    verbose=False,
     now=datetime.datetime.now,
     run=subprocess.run,
     exists=pathlib.Path.exists,
@@ -1172,6 +1177,7 @@ def build(
         ignore_release_time=ignore_release_time,
         now=now,
         run=run,
+        verbose=verbose,
         exists=exists,
         callbacks=callbacks,
     )
@@ -1419,6 +1425,12 @@ def cli(argv=None):
         default=None,
         help="artifacts will be built and published only if their key matches this string",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        default=False,
+        help="let stdout and stderr through when building artifacts",
+    )
     parser.add_argument("--now",)
     args = parser.parse_args(argv)
 
@@ -1547,6 +1559,7 @@ def cli(argv=None):
         discovered,
         callbacks=CLIBuildCallbacks(),
         ignore_release_time=args.ignore_release_time,
+        verbose=args.verbose,
         now=now,
     )
 
