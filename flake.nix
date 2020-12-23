@@ -9,7 +9,7 @@
       forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems (system: f system);
     in
       {
-        gradelib = forAllSystems (system:
+        publish = forAllSystems (system:
           with import nixpkgs { system = "${system}"; };
 
             python3Packages.buildPythonPackage {
@@ -22,7 +22,7 @@
           );
 
         defaultPackage = forAllSystems (system:
-            self.gradelib.${system}
+            self.publish.${system}
           );
       };
 
