@@ -248,6 +248,7 @@ along with metadata:</p>
         <span class="nt">recipe</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">make solution</span>
         <span class="nt">release_time</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1 day after metadata.due</span>
         <span class="nt">ready</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">false</span>
+        <span class="nt">missing_ok</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">false</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">file</span></code> field tells <em>publish</em> where the file will appear when the recipe
@@ -261,6 +262,11 @@ metadata field.  The field it refers to must be a datetime.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">ready</span></code> field is a manual override which prevents the artifact from
 being built and published before it is ready. If not provided, the artifact
 is assumed to be ready.</p>
+<p>THe <code class="docutils literal notranslate"><span class="pre">missing_ok</span></code> field is a boolean which, if <code class="docutils literal notranslate"><span class="pre">false</span></code>, causes an error to
+be raised if the artifact’s file is missing after the build. This is the
+default behavior.  If set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, no error is raised. This can be useful
+when the artifact file is manually placed in the directory and it is
+undesirable to repeatedly edit <code class="docutils literal notranslate"><span class="pre">publish.yaml</span></code> to add the artifact.</p>
 <p>Publications may also have <code class="docutils literal notranslate"><span class="pre">release_time</span></code> and <code class="docutils literal notranslate"><span class="pre">ready</span></code> attributes. If these
 are provided they will take precedence over the attributes of an individual
 artifact in the publication. The release time of the publication can be used
@@ -518,6 +524,18 @@ stages of the discover -&gt; build -&gt; publish process. Each are subclasses of
 <dt id="publish.UnbuiltArtifact.ready">
 <code class="sig-name descname">ready</code><a class="headerlink" href="#publish.UnbuiltArtifact.ready" title="Permalink to this definition">¶</a></dt>
 <dd><p>Whether or not the artifact is ready for publication. Default: True.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt id="publish.UnbuiltArtifact.missing_ok">
+<code class="sig-name descname">missing_ok</code><a class="headerlink" href="#publish.UnbuiltArtifact.missing_ok" title="Permalink to this definition">¶</a></dt>
+<dd><p>If True and the file is missing after building, then no error is raised and the
+result of the build is <cite>None</cite>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
 <dd class="field-odd"><p>bool</p>
@@ -999,6 +1017,12 @@ and provide an instance to <a class="reference internal" href="#publish.build" t
 <dt id="publish.BuildCallbacks.on_build">
 <code class="sig-name descname">on_build</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">node</span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuildCallbacks.on_build" title="Permalink to this definition">¶</a></dt>
 <dd><p>Called when building a collection/publication/artifact.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt id="publish.BuildCallbacks.on_missing">
+<code class="sig-name descname">on_missing</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">artifact</span><span class="p">:</span> <span class="n"><a class="reference internal" href="#publish.UnbuiltArtifact" title="publish.UnbuiltArtifact">publish.UnbuiltArtifact</a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#publish.BuildCallbacks.on_missing" title="Permalink to this definition">¶</a></dt>
+<dd><p>Called when the artifact file is missing, but missing is OK.</p>
 </dd></dl>
 
 <dl class="py method">
