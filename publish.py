@@ -749,6 +749,7 @@ def read_publication_file(path):
                     "file": {"type": "string", "default": None, "nullable": True},
                     "recipe": {"type": "string", "default": None, "nullable": True},
                     "ready": {"type": "boolean", "default": True, "nullable": True},
+                    "missing_ok": {"type": "boolean", "default": False},
                     "release_time": {
                         "type": ["datetime", "string"],
                         "default": None,
