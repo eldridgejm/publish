@@ -187,6 +187,20 @@ def test_build_artifact_when_recipe_is_none_raises_if_no_file():
         result = publish.build(artifact, run=run, exists=exists)
 
 
+def test_build_artifact_when_recipe_is_none_does_not_raise_if_missing_ok():
+    # given
+    artifact = publish.UnbuiltArtifact(
+        workdir=pathlib.Path.cwd(), file="foo.pdf", recipe=None, missing_ok=True
+    )
+
+    run = Mock()
+    exists = Mock(return_value=False)
+
+    # when
+    result = publish.build(artifact, run=run, exists=exists)
+    assert result is None
+
+
 def test_build_artifact_raises_if_no_file():
     # given
     artifact = publish.UnbuiltArtifact(

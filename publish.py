@@ -291,6 +291,7 @@ class UnbuiltArtifact(Artifact, typing.NamedTuple):
     recipe: str = None
     release_time: datetime.datetime = None
     ready: bool = True
+    missing_ok: bool = False
 
 
 class BuiltArtifact(Artifact, typing.NamedTuple):
@@ -1075,7 +1076,9 @@ def _build_artifact(
     Returns
     -------
     Optional[BuiltArtifact]
-        A summary of the build results.
+        A summary of the build results. The result is `None` if the build time
+        is in the future, or if the file was not created and missing_ok is
+        True.
 
     """
     output = BuiltArtifact(workdir=artifact.workdir, file=artifact.file)
@@ -1120,7 +1123,10 @@ def _build_artifact(
 
     filepath = artifact.workdir / artifact.file
     if not exists(filepath):
-        raise BuildError(f"Artifact file {filepath} does not exist.")
+        if artifact.missing_ok:
+            return None
+        else:
+            raise BuildError(f"Artifact file {filepath} does not exist.")
 
     output = output._replace(returncode=returncode, stdout=stdout, stderr=stderr)
     callbacks.on_success(output)
