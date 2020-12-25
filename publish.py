@@ -1472,7 +1472,7 @@ def cli(argv=None):
     class CLIDiscoverCallbacks(DiscoverCallbacks):
         def on_publication(self, path):
             publication_name = str(path.parent)
-            print(f'{_normal(publication_name)}')
+            print(f"{_normal(publication_name)}")
 
         def on_skip(self, path):
             relpath = path.relative_to(args.input_directory)
@@ -1485,7 +1485,7 @@ def cli(argv=None):
                     args.input_directory.absolute()
                 )
                 path = relative_workdir / key
-                print(_normal(str(path)), end='')
+                print(_normal(str(path)), end="")
 
         def on_too_soon(self, node):
             if isinstance(node, UnbuiltArtifact):
@@ -1511,7 +1511,7 @@ def cli(argv=None):
                         args.input_directory.absolute()
                     )
                     path = relative_workdir / key
-                    print(str(path) + ' ' + _warning(msg))
+                    print(str(path) + " " + _warning(msg))
 
         def on_success(self, output):
             print(_success(" build was successful ✓"))
@@ -1532,11 +1532,10 @@ def cli(argv=None):
             msg = f"<input_directory>/{src} to <output_directory>/{dst}."
             print(_normal(msg))
 
-
     # begin the discover -> build -> publish process
 
     print()
-    print(_header('Discovered publications:'))
+    print(_header("Discovered publications:"))
 
     discovered = discover(
         args.input_directory,
@@ -1558,7 +1557,7 @@ def cli(argv=None):
         )
 
     print()
-    print(_header('Building:'))
+    print(_header("Building:"))
 
     built = build(
         discovered,
@@ -1569,7 +1568,7 @@ def cli(argv=None):
     )
 
     print()
-    print(_header('Copying:'))
+    print(_header("Copying:"))
     published = publish(built, args.output_directory, callbacks=CLIPublishCallbacks())
 
     # serialize the results
