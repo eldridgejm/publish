@@ -106,6 +106,7 @@ along with metadata:
             recipe: make solution
             release_time: 1 day after metadata.due
             ready: false
+            missing_ok: false
 
 The ``file`` field tells *publish* where the file will appear when the recipe
 is run.  is omitted, its value is assumed to be the artifact's key -- for
@@ -120,6 +121,12 @@ metadata field.  The field it refers to must be a datetime.
 The ``ready`` field is a manual override which prevents the artifact from
 being built and published before it is ready. If not provided, the artifact
 is assumed to be ready.
+
+THe ``missing_ok`` field is a boolean which, if ``false``, causes an error to
+be raised if the artifact's file is missing after the build. This is the
+default behavior.  If set to ``true``, no error is raised. This can be useful
+when the artifact file is manually placed in the directory and it is
+undesirable to repeatedly edit ``publish.yaml`` to add the artifact.
 
 Publications may also have ``release_time`` and ``ready`` attributes. If these
 are provided they will take precedence over the attributes of an individual
@@ -283,6 +290,9 @@ class UnbuiltArtifact(Artifact, typing.NamedTuple):
         Time/date the artifact should be made public. If None, it is always available.
     ready : bool
         Whether or not the artifact is ready for publication. Default: True.
+    missing_ok : bool
+        If True and the file is missing after building, then no error is raised and the
+        result of the build is `None`.
 
     """
 
@@ -1046,6 +1056,9 @@ class BuildCallbacks:
     def on_not_ready(self, artifact: UnbuiltArtifact):
         """Called when the artifact is not ready."""
 
+    def on_missing(self, artifact: UnbuiltArtifact):
+        """Called when the artifact file is missing, but missing is OK."""
+
     def on_recipe(self, artifact: UnbuiltArtifact):
         """Called when artifact is being built using its recipe."""
 
@@ -1124,6 +1137,7 @@ def _build_artifact(
     filepath = artifact.workdir / artifact.file
     if not exists(filepath):
         if artifact.missing_ok:
+            callbacks.on_missing(artifact)
             return None
         else:
             raise BuildError(f"Artifact file {filepath} does not exist.")
@@ -1504,6 +1518,9 @@ def cli(argv=None):
                 "Skipping."
             )
             print(_warning(msg))
+
+        def on_missing(self, node):
+            print(_warning(" file missing, but missing_ok=True"))
 
         def on_not_ready(self, node):
             msg = f"not ready → skipping"
