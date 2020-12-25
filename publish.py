@@ -1471,7 +1471,8 @@ def cli(argv=None):
 
     class CLIDiscoverCallbacks(DiscoverCallbacks):
         def on_publication(self, path):
-            print(_header(f"Discovered publication {path}"))
+            publication_name = str(path.parent)
+            print(f'{_normal(publication_name)}')
 
         def on_skip(self, path):
             relpath = path.relative_to(args.input_directory)
@@ -1483,9 +1484,8 @@ def cli(argv=None):
                 relative_workdir = node.workdir.relative_to(
                     args.input_directory.absolute()
                 )
-                print(_header(f"    Building artifact {relative_workdir}/{key}"))
-            elif isinstance(node, Publication):
-                print(_header(f"Building publication {key}"))
+                path = relative_workdir / key
+                print(_normal(str(path)), end='')
 
         def on_too_soon(self, node):
             if isinstance(node, UnbuiltArtifact):
@@ -1500,16 +1500,21 @@ def cli(argv=None):
             print(_warning(msg))
 
         def on_not_ready(self, node):
-            if isinstance(node, UnbuiltArtifact):
-                tabs = "\t"
-            else:
-                tabs = ""
+            msg = f"not ready → skipping"
 
-            msg = f"{tabs}Not ready. Skipping"
-            print(_warning(msg))
+            if isinstance(node, UnbuiltArtifact):
+                print(_warning(f" {msg}"))
+
+            else:
+                for key, artifact in node.artifacts.items():
+                    relative_workdir = artifact.workdir.relative_to(
+                        args.input_directory.absolute()
+                    )
+                    path = relative_workdir / key
+                    print(str(path) + ' ' + _warning(msg))
 
         def on_success(self, output):
-            print(_success("\tBuild was successful"))
+            print(_success(" build was successful ✓"))
 
     class CLIFilterCallbacks(FilterCallbacks):
         def on_miss(self, x):
@@ -1524,17 +1529,14 @@ def cli(argv=None):
         def on_copy(self, src, dst):
             src = src.relative_to(args.input_directory.absolute())
             dst = dst.relative_to(args.output_directory)
-            msg = f"\tCopying <input_directory>/{src} to <output_directory>/{dst}."
-            print(_body(msg))
+            msg = f"<input_directory>/{src} to <output_directory>/{dst}."
+            print(_normal(msg))
 
-        def on_publish(self, key, node):
-            if isinstance(node, BuiltArtifact):
-                relative_workdir = node.workdir.relative_to(
-                    args.input_directory.absolute()
-                )
-                print(_header(f"Publishing {relative_workdir}/{key}"))
 
     # begin the discover -> build -> publish process
+
+    print()
+    print(_header('Discovered publications:'))
 
     discovered = discover(
         args.input_directory,
@@ -1555,6 +1557,9 @@ def cli(argv=None):
             discovered, keep, remove_empty_nodes=True, callbacks=CLIFilterCallbacks()
         )
 
+    print()
+    print(_header('Building:'))
+
     built = build(
         discovered,
         callbacks=CLIBuildCallbacks(),
@@ -1563,6 +1568,8 @@ def cli(argv=None):
         now=now,
     )
 
+    print()
+    print(_header('Copying:'))
     published = publish(built, args.output_directory, callbacks=CLIPublishCallbacks())
 
     # serialize the results
