@@ -1,0 +1,11 @@
+schema:
+    required_artifacts:
+        - homework
+        - solution
+
+    optional_artifacts:
+        - template
+
+    metadata_schema:
+        name:
+            type: string

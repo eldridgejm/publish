@@ -10,17 +10,20 @@ import publish
 # good example; simple
 EXAMPLE_1_DIRECTORY = pathlib.Path(__file__).parent / "example_1"
 
-# bad collection file
+# bad: bad collection file
 EXAMPLE_2_DIRECTORY = pathlib.Path(__file__).parent / "example_2"
 
-# mismatched publication metadata
+# bad: mismatched publication metadata
 EXAMPLE_3_DIRECTORY = pathlib.Path(__file__).parent / "example_3"
 
-# nested collections
+# bad: nested collections
 EXAMPLE_4_DIRECTORY = pathlib.Path(__file__).parent / "example_4"
 
-# relative paths as keys
+# good: relative paths as keys
 EXAMPLE_5_DIRECTORY = pathlib.Path(__file__).parent / "example_5"
+
+# bad: publication metadata doesn't match schema
+EXAMPLE_6_DIRECTORY = pathlib.Path(__file__).parent / "example_6"
 
 
 def test_discover_finds_collections():
@@ -117,6 +120,11 @@ def test_discover_validates_collection_schema():
 def test_discover_validates_publication_schema():
     with raises(publish.DiscoveryError):
         publish.discover(EXAMPLE_3_DIRECTORY)
+
+
+def test_discover_validates_publication_metadata_schema():
+    with raises(publish.DiscoveryError):
+        publish.discover(EXAMPLE_6_DIRECTORY)
 
 
 def test_dicover_raises_when_nested_collections_discovered():
@@ -830,3 +838,37 @@ def test_read_artifact_with_absolute_release_time(write_file):
     # then
     expected = datetime.datetime(2020, 1, 2, 23, 59, 0)
     assert publication.artifacts["solution"].release_time == expected
+
+
+# relative metadata
+# --------------------------------------------------------------------------------------
+
+def test_read_artifact_with_relative_dates_in_metadata(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-10 23:59:00
+                released: 7 days before due
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 2020-01-02 23:59:00
+            """
+        ),
+    )
+
+    # when
+    publication = publish.read_publication_file(path)
+
+    # then
+    expected = datetime.datetime(2020, 9, 3, 23, 59, 0)
+    # assert publication.metadata["released"] == expected

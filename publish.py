@@ -519,6 +519,8 @@ def validate(publication: Publication, against: Schema):
     ----------
     publication : Publication
         A fully-specified publication.
+    against : Schema
+        A schema for validating the publication.
 
     Raises
     ------
@@ -698,18 +700,26 @@ def _parse_release_time(s, metadata):
     return metadata[variable] + delta
 
 
-def read_publication_file(path):
+def read_publication_file(path, schema=None):
     """Read a :class:`Publication` from a yaml file.
 
     Parameters
     ----------
     path : pathlib.Path
         Path to the collection file.
+    schema : Optional[Schema]
+        A schema for validating the publication. Default: None, in which case the
+        publication's metadata are not validated.
 
     Returns
     -------
     Publication
         The publication.
+
+    Raises
+    ------
+    ValidationError
+        If ``schema`` is provided and the publication metadata is not valid.
 
     Notes
     -----
@@ -723,9 +733,11 @@ def read_publication_file(path):
     a "ready" key; if this is False, the publication will not be considered
     released.
 
-    Only very basic validation is performed by this function. Namely, the
-    metadata schema and required/optional artifacts are not enforced. See the
-    :func:`validate` function for validating these aspects of the publication.
+    If the ``schema`` argument is not provided, only very basic validation is
+    performed by this function. Namely, the metadata schema and
+    required/optional artifacts are not enforced. See the :func:`validate`
+    function for validating these aspects of the publication. If the schema is
+    provided, :func:`validate` is called as a convenience.
 
 
     """
@@ -734,7 +746,7 @@ def read_publication_file(path):
 
     # we'll just do a quick check of the file structure first. validating the metadata
     # schema and checking that the right artifacts are provided will be done later
-    schema = {
+    quick_schema = {
         "ready": {"type": "boolean", "default": True, "nullable": True},
         "release_time": {
             "type": ["datetime", "string"],
@@ -761,7 +773,7 @@ def read_publication_file(path):
     }
 
     # validate and normalize the contents
-    validator = cerberus.Validator(schema, require_all=True)
+    validator = cerberus.Validator(quick_schema, require_all=True)
     validated = validator.validated(contents)
 
     if validated is None:
@@ -792,12 +804,17 @@ def read_publication_file(path):
     except ValueError as exc:
         raise DiscoveryError(str(exc), path)
 
-    return Publication(
+    publication = Publication(
         metadata=metadata,
         artifacts=artifacts,
         ready=validated["ready"],
         release_time=release_time,
     )
+
+    if schema is not None:
+        validate(publication, against=schema)
+
+    return publication
 
 
 # discovery: discover()
@@ -964,11 +981,9 @@ def discover(
 
         # read the publication file
         publication_file = path / PUBLICATION_FILE
-        publication = read_publication_file(publication_file)
 
-        # validate its contents against parent collection's schema
         try:
-            validate(publication, against=parent_collection.schema)
+            publication = read_publication_file(publication_file, schema=parent_collection.schema)
         except ValidationError as exc:
             raise DiscoveryError(str(exc), publication_file)
 

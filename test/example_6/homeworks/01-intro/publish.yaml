@@ -1,0 +1,7 @@
+metadata:
+    what: ok
+
+artifacts:
+    homework:
+        file: ./build/nothing.pdf
+        recipe: make
