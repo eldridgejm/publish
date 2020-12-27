@@ -718,8 +718,8 @@ def read_publication_file(path, schema=None):
 
     Raises
     ------
-    ValidationError
-        If ``schema`` is provided and the publication metadata is not valid.
+    DiscoveryError
+        If the publication file's contents are invalid.
 
     Notes
     -----
@@ -812,7 +812,10 @@ def read_publication_file(path, schema=None):
     )
 
     if schema is not None:
-        validate(publication, against=schema)
+        try:
+            validate(publication, against=schema)
+        except ValidationError as exc:
+            raise DiscoveryError(str(exc), path)
 
     return publication
 
