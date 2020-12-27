@@ -233,7 +233,7 @@ import cerberus
 # constants
 # --------------------------------------------------------------------------------------
 
-__version__ = (0, 1, 4)
+__version__ = (0, 1, 5)
 
 # the file used to define a collection
 COLLECTION_FILE = "collection.yaml"
