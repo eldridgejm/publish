@@ -1,58 +1,61 @@
-import publish
+"""Tests for resolve_smart_dates."""
+
 import datetime
 
 from pytest import raises
 
+import publish
 
-def test_resolve_smart_dates_on_simple_example():
+
+# there are several types of smart dates:
+#
+#   - direct reference;
+#       "due"
+#   - delta reference (before or after), (days or hours);
+#       "7 days before due", "7 days after due"
+#   - day of given week;
+#       "monday of week 2"
+#   - first available (before or after);
+#       "first monday, wednesday, or friday after previous.release",
+#       "first monday, wednesday, or friday before previous.released"
+#
+# any of these can have a time appended. for example:
+#
+#   - due at 23:59:00
+#   - 7 days before due at 23:59:00
+#   - monday of week 02 at 23:59:00
+#   - first monday, wednesday, or friday after previous.release at 23:59:00
+
+
+# direct reference
+# --------------------------------------------------------------------------------------
+
+
+def test_direct_reference():
     # given
     smart_dates = {
-        "due": datetime.date(2020, 12, 15),
-        "released": "7 days before due",
-        "graded": "5 days after due",
+        "released": "due",
     }
+    date_context = publish.DateContext(known={"due": datetime.date(2020, 12, 15),})
 
     # when
-    resolved = publish.resolve_smart_dates(smart_dates, universe={})
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
 
     # then
     assert resolved == {
-        "due": datetime.date(2020, 12, 15),
-        "released": datetime.date(2020, 12, 8),
-        "graded": datetime.date(2020, 12, 20),
+        "released": datetime.date(2020, 12, 15),
     }
 
 
-def test_resolve_smart_dates_on_simple_example_with_time():
-    # given
-    smart_dates = {
-        "due": datetime.date(2020, 12, 15),
-        "released": "7 days before due at 13:13:13",
-        "graded": "5 days after due",
-    }
-
-    # when
-    resolved = publish.resolve_smart_dates(smart_dates, universe={})
-
-    # then
-    assert resolved == {
-        "due": datetime.date(2020, 12, 15),
-        "released": datetime.datetime(2020, 12, 8, 13, 13, 13),
-        "graded": datetime.date(2020, 12, 20),
-    }
-
-
-def test_resolve_smart_dates_on_short_example_with_time():
+def test_direct_reference_with_time():
     # given
     smart_dates = {
         "released": "due at 13:13:13",
     }
-    universe = {
-        "due": datetime.date(2020, 12, 15),
-    }
+    date_context = publish.DateContext(known={"due": datetime.date(2020, 12, 15),})
 
     # when
-    resolved = publish.resolve_smart_dates(smart_dates, universe=universe)
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
 
     # then
     assert resolved == {
@@ -60,7 +63,101 @@ def test_resolve_smart_dates_on_short_example_with_time():
     }
 
 
-def test_resolve_smart_dates_raises_on_cycle():
+# delta reference
+# --------------------------------------------------------------------------------------
+#  e.g., "7 days before due", "7 days after due", "7 hours after due"
+
+
+def test_delta_reference_before_days():
+    # given
+    smart_dates = {
+        "released": "7 days before due",
+    }
+
+    date_context = publish.DateContext(known={"due": datetime.date(2020, 12, 15)})
+
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+    # then
+    assert resolved == {
+        "released": datetime.date(2020, 12, 8),
+    }
+
+
+def test_delta_reference_after_days():
+    # given
+    smart_dates = {
+        "released": "7 days after due",
+    }
+
+    date_context = publish.DateContext(known={"due": datetime.date(2020, 12, 15)})
+
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+    # then
+    assert resolved == {
+        "released": datetime.date(2020, 12, 22),
+    }
+
+
+def test_delta_reference_before_hours():
+    # given
+    smart_dates = {
+        "released": "7 hours before due",
+    }
+
+    date_context = publish.DateContext(
+        known={"due": datetime.datetime(2020, 12, 15, 23, 59, 0)}
+    )
+
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+    # then
+    assert resolved == {
+        "released": datetime.datetime(2020, 12, 15, 16, 59, 0),
+    }
+
+
+def test_delta_reference_after_hours():
+    # given
+    smart_dates = {
+        "released": "7 hours after due",
+    }
+
+    date_context = publish.DateContext(
+        known={"due": datetime.datetime(2020, 12, 15, 0, 59, 0)}
+    )
+
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+    # then
+    assert resolved == {
+        "released": datetime.datetime(2020, 12, 15, 7, 59, 0),
+    }
+
+
+def test_delta_reference_with_time():
+    # given
+    smart_dates = {
+        "released": "7 days before due at 13:13:13",
+    }
+
+    date_context = publish.DateContext(known={"due": datetime.date(2020, 12, 15)})
+
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+    # then
+    assert resolved == {
+        "released": datetime.datetime(2020, 12, 8, 13, 13, 13),
+    }
+
+
+def test_delta_reference_with_cycle_raises():
     # given
     smart_dates = {
         "due": "1 day before released",
@@ -70,179 +167,165 @@ def test_resolve_smart_dates_raises_on_cycle():
 
     # when
     with raises(publish.ValidationError):
-        publish.resolve_smart_dates(smart_dates, universe={})
+        publish.resolve_smart_dates(smart_dates)
 
 
-def test_resolve_smart_dates_raises_on_cycle():
+# first available reference
+# --------------------------------------------------------------------------------------
+# e.g., "first monday, wednesday, or friday after previous.release",
+# e.g., "first monday, wednesday, or friday before previous.released"
+
+
+def test_first_available_after_single_day():
     # given
     smart_dates = {
-        "due": "1 day before released",
-        "released": "7 days before due",
-        "graded": "5 days after due",
+        "released": "first monday after previous.released",
     }
 
-    # when
-    with raises(publish.ValidationError):
-        publish.resolve_smart_dates(smart_dates, universe={})
-
-
-def test_resolve_smart_dates_with_week_reference():
-    # given
-    smart_dates = {
-        "due": "tuesday of week 02",
-        "released": "7 days before due",
-        "graded": "5 days after due",
-    }
-
-    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
-
-    # when
-    resolved = publish.resolve_smart_dates(
-        smart_dates, universe={}, date_context=date_context
+    date_context = publish.DateContext(
+        known={"previous.released": datetime.date(2020, 12, 15)}
     )
 
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
     # then
-    assert resolved["due"] == datetime.date(2021, 1, 26)
-    assert resolved["released"] == datetime.date(2021, 1, 19)
-    assert resolved["graded"] == datetime.date(2021, 1, 31)
-
-
-
-def test_resolve_smart_dates_with_week_reference_with_time():
-    # given
-    smart_dates = {
-        "due": "tuesday of week 02 at 11:11:11",
-        "released": "7 days before due",
-        "graded": "5 days after due",
+    assert resolved == {
+        "released": datetime.date(2020, 12, 21),
     }
 
-    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
 
-    # when
-    resolved = publish.resolve_smart_dates(
-        smart_dates, universe={}, date_context=date_context
+def test_first_available_before_single_day():
+    # given
+    smart_dates = {
+        "released": "first monday before previous.released",
+    }
+
+    date_context = publish.DateContext(
+        known={"previous.released": datetime.date(2020, 12, 15)}
     )
 
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
     # then
-    assert resolved["due"] == datetime.datetime(2021, 1, 26, 11, 11, 11)
-    assert resolved["released"] == datetime.datetime(2021, 1, 19, 11, 11, 11)
-    assert resolved["graded"] == datetime.datetime(2021, 1, 31, 11, 11, 11)
-
-
-
-def test_resolve_smart_dates_with_week_reference_raises_if_start_week_not_set():
-    # given
-    smart_dates = {
-        "due": "tuesday of week 02",
-        "released": "7 days before due",
-        "graded": "5 days after due",
+    assert resolved == {
+        "released": datetime.date(2020, 12, 14),
     }
 
-    # when
-    with raises(RuntimeError):
-        resolved = publish.resolve_smart_dates(smart_dates, universe={},)
 
-
-
-def test_resolve_smart_dates_with_weekday_references_before():
+def test_first_available_after_single_day_excludes_current_day():
     # given
     smart_dates = {
-        "due": "tuesday of week 02",
-        "released": "monday before due",  # <----- this is what we're testing
-        "graded": "5 days after due",
+        "released": "first tuesday after previous.released",
     }
-    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
 
-    # when
-    resolved = publish.resolve_smart_dates(
-        smart_dates, universe={}, date_context=date_context
+    date_context = publish.DateContext(
+        known={"previous.released": datetime.date(2020, 12, 15)}  # this is a tuesday
     )
 
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
     # then
-    assert resolved["due"] == datetime.date(2021, 1, 26)
-    assert resolved["released"] == datetime.date(2021, 1, 25)
-    assert resolved["graded"] == datetime.date(2021, 1, 31)
+    assert resolved == {
+        "released": datetime.date(2020, 12, 22),
+    }
 
 
-
-def test_resolve_smart_dates_with_weekday_references_after():
+def test_first_available_before_single_day_excludes_current_day():
     # given
     smart_dates = {
-        "due": "tuesday of week 02",
-        "released": "friday after due",  # <----- this is what we're testing
-        "graded": "5 days after due",
+        "released": "first tuesday before previous.released",
     }
-    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
 
-    # when
-    resolved = publish.resolve_smart_dates(
-        smart_dates, universe={}, date_context=date_context
+    date_context = publish.DateContext(
+        known={"previous.released": datetime.date(2020, 12, 15)}  # this is a tuesday
     )
 
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
     # then
-    assert resolved["due"] == datetime.date(2021, 1, 26)
-    assert resolved["released"] == datetime.date(2021, 1, 29)
-    assert resolved["graded"] == datetime.date(2021, 1, 31)
+    assert resolved == {
+        "released": datetime.date(2020, 12, 8),
+    }
 
 
-
-def test_resolve_smart_dates_with_weekday_references_with_time():
+def test_first_available_after_multiple_days():
     # given
     smart_dates = {
-        "due": "tuesday of week 02",
-        "released": "friday after due at 08:00:00",  # <----- this is what we're testing
-        "graded": "5 days after due",
+        "released": "first monday or wednesday after previous.released",
     }
-    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
 
-    # when
-    resolved = publish.resolve_smart_dates(
-        smart_dates, universe={}, date_context=date_context
+    date_context = publish.DateContext(
+        known={"previous.released": datetime.date(2020, 12, 16)}
     )
 
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
     # then
-    assert resolved["due"] == datetime.date(2021, 1, 26)
-    assert resolved["released"] == datetime.datetime(2021, 1, 29, 8, 0, 0)
-    assert resolved["graded"] == datetime.date(2021, 1, 31)
+    assert resolved == {
+        "released": datetime.date(2020, 12, 21),
+    }
 
 
-
-def test_resolve_smart_dates_with_weekday_references_before_excludes_current_day():
+def test_first_available_before_multiple_days():
     # given
     smart_dates = {
-        "due": "tuesday of week 02",
-        "released": "tuesday before due",  # <----- this is what we're testing
-        "graded": "5 days after due",
+        "released": "first monday or wednesday before previous.released",
     }
-    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
 
-    # when
-    resolved = publish.resolve_smart_dates(
-        smart_dates, universe={}, date_context=date_context
+    date_context = publish.DateContext(
+        known={"previous.released": datetime.date(2020, 12, 16)}
     )
 
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
     # then
-    assert resolved["due"] == datetime.date(2021, 1, 26)
-    assert resolved["released"] == datetime.date(2021, 1, 19)
-    assert resolved["graded"] == datetime.date(2021, 1, 31)
+    assert resolved == {
+        "released": datetime.date(2020, 12, 14),
+    }
 
 
-
-def test_resolve_smart_dates_with_weekday_references_after_excludes_current_day():
+def test_first_available_before_multiple_days_with_commas():
     # given
     smart_dates = {
-        "due": "tuesday of week 02",
-        "released": "tuesday after due",  # <----- this is what we're testing
-        "graded": "5 days after due",
+        "released": "first monday, wednesday, or friday before previous.released",
     }
-    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
 
-    # when
-    resolved = publish.resolve_smart_dates(
-        smart_dates, universe={}, date_context=date_context
+    date_context = publish.DateContext(
+        known={"previous.released": datetime.date(2020, 12, 16)}
     )
 
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
     # then
-    assert resolved["due"] == datetime.date(2021, 1, 26)
-    assert resolved["released"] == datetime.date(2021, 2, 2)
-    assert resolved["graded"] == datetime.date(2021, 1, 31)
+    assert resolved == {
+        "released": datetime.date(2020, 12, 14),
+    }
+
+
+# day of given week
+# --------------------------------------------------------------------------------------
+# e.g., "monday of week 02"
+
+
+def test_day_of_a_given_week():
+    # given
+    smart_dates = {
+        "released": "tuesday of week 02",
+    }
+
+    date_context = publish.DateContext(start_of_week_one=datetime.date(2020, 12, 10))
+
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+    # then
+    assert resolved == {
+        "released": datetime.date(2020, 12, 22),
+    }

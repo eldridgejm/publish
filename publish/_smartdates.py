@@ -1,3 +1,6 @@
+"""Functions for converting natural language descriptions of dates to Python objects."""
+
+
 import enum
 import typing
 import datetime
@@ -5,6 +8,17 @@ import re
 
 from .exceptions import ValidationError
 from .types import DateContext
+
+
+# first, we parse each smart date string into a Node object which represents the
+# smart date in Python, but is not yet a datetime object. These nodes may contain
+# links to other nodes; a link (a, b) means that b must be resolved before a. We
+# topologically sort the nodes to determine resolution order, then we resolve each
+# node in turn.
+
+
+class _MatchError(Exception):
+    """Raised if a parse fails because the string does not match."""
 
 
 class _DaysOfTheWeek(enum.IntEnum):
@@ -17,144 +31,277 @@ class _DaysOfTheWeek(enum.IntEnum):
     SUNDAY = 6
 
 
-class _RelativeDateRule(typing.NamedTuple):
-    delta: datetime.timedelta
-    relative_to: str
-    time: typing.Optional[datetime.time] = None
+def _parse_and_remove_time(s):
+    """Looks for a time at the end of the smart date string.
 
-
-class _RelativeDayOfTheWeekRule(typing.NamedTuple):
-    relative_to: str
-    direction: str
-    day_of_the_week: _DaysOfTheWeek
-    time: typing.Optional[datetime.time] = None
-
-
-class _WeekRule(typing.NamedTuple):
-    week_number: int
-    day_of_the_week: _DaysOfTheWeek
-    time: typing.Optional[datetime.time] = None
-
-
-def _parse_relative_date_rule(s):
-    """Reads a relative date rule from natural language.
-
-    This supports several forms, such as:
-
-        - 3 days before other_field
-        - 1 day before other_field
-        - 5 days after other_field
-
-    Case doesn't matter. 
+    A time is of the form " at 23:59:00"
 
     Parameters
     ----------
     s : str
-        The string to read.
-
-    Raises
-    ------
-    ValidationError
-        If the string cannot be read as a relative date.
+        The smart date string
 
     Returns
     -------
-    RelativeDateRule
-        The rule read from the text.
-
+    str
+        The input, ``s``, but without a time at the end (if there was one in the first
+        place).
+    Union[datetime.time, None]
+        The time, if there was one; otherwise this is ``None``.
+        
     """
     time_pattern = r" at (\d{2}):(\d{2}):(\d{2})$"
-    match_with_time = re.search(time_pattern, s)
-    if match_with_time:
-        time_raw = match_with_time.groups()
+    match = re.search(time_pattern, s)
+
+    if match:
+        time_raw = match.groups()
         time = datetime.time(*[int(x) for x in time_raw])
         s = re.sub(time_pattern, "", s)
     else:
         time = None
 
-    short_match = re.match(r"([\w\.]+)$", s)
-    long_match = re.match(r"^(\d+) (hour|day)[s]{0,1} (after|before) ([\w\.]+)$", s)
+    return s, time
 
-    if not (short_match or long_match):
-        raise ValidationError("Did not match.")
 
-    if short_match:
-        variable = short_match.groups()[0]
-        return _RelativeDateRule(
-            delta=datetime.timedelta(days=0), relative_to=variable, time=time
+def _combine_date_and_time(date, time):
+    if time is not None:
+        return datetime.datetime.combine(date, time)
+    else:
+        return date
+
+
+# node types
+# --------------------------------------------------------------------------------------
+
+
+class _DateNode:
+    """A non-reference node representing a date/datetime."""
+
+    def __init(self, date):
+        self.date = date
+
+    @classmethod
+    def parse(cls, date):
+        if not isinstance(date, (datetime.date, datetime.datetime)):
+            raise _MatchError("Not a date/datetime.")
+
+        return cls(date)
+
+    def resolve(self, universe, date_context):
+        return self.date
+
+
+class _DirectReferenceNode:
+    """A node representing a direct reference.
+
+    Parameters
+    ----------
+    relative_to : str
+        The name of the node that is referred to.
+    time : Optional[datetime.time]
+        The time. If ``None``, the result will be inferred from referred field
+        (if it is a datetime field) or will not have a time component (if the referred
+        field is just a date).
+
+    """
+
+    def __init__(self, relative_to, time):
+        self.relative_to = relative_to
+        self.time = time
+
+    @classmethod
+    def parse(cls, s):
+        s = s.lower()
+        s, time = _parse_and_remove_time(s)
+
+        match = re.match(r"([\w\.]+)$", s)
+        if not match:
+            raise _MatchError("Not a match.")
+
+        return cls(relative_to=match.groups()[0], time=time)
+
+    def resolve(self, universe, date_context):
+        return _combine_date_and_time(universe[self.relative_to], self.time)
+
+
+class _DeltaReferenceNode:
+    """A node representing a delta reference.
+
+    Parameters
+    ----------
+    delta : datetime.timedelta
+        The time delta between this date and the referred date.
+    relative_to : str
+        The name of the node that is referred to.
+    time : Optional[datetime.time]
+        The time. If ``None``, the result will be inferred from referred field
+        (if it is a datetime field) or will not have a time component (if the referred
+        field is just a date).
+
+    """
+
+    def __init__(self, delta, relative_to, time):
+        self.delta = delta
+        self.relative_to = relative_to
+        self.time = time
+
+    @classmethod
+    def parse(cls, s):
+        s = s.lower()
+        s, time = _parse_and_remove_time(s)
+
+        match = re.match(r"^(\d+) (hour|day)[s]{0,1} (after|before) ([\w\.]+)$", s)
+
+        if not match:
+            raise _MatchError("Did not match.")
+
+        number, hours_or_days, before_or_after, variable = match.groups()
+        factor = -1 if before_or_after == "before" else 1
+
+        if hours_or_days == "hour":
+            timedelta_kwargs = {"hours": factor * int(number)}
+        else:
+            timedelta_kwargs = {"days": factor * int(number)}
+
+        delta = datetime.timedelta(**timedelta_kwargs)
+        return cls(delta=delta, relative_to=variable, time=time)
+
+    def resolve(self, universe, date_context):
+        date = universe[self.relative_to] + self.delta
+        return _combine_date_and_time(date, self.time)
+
+
+def _parse_day_of_the_week(s):
+    return {getattr(_DaysOfTheWeek, x.upper()) for x in s.split()}
+
+
+class _FirstAvailableNode:
+    """A node representing a first available reference.
+
+    Parameters
+    ----------
+    day_of_the_week : Collection[DaysOfTheWeek]
+    relative_to : str
+        The name of the node that is referred to.
+    time : Optional[datetime.time]
+        The time. If ``None``, the result will be inferred from referred field
+        (if it is a datetime field) or will not have a time component (if the referred
+        field is just a date).
+
+    """
+
+    def __init__(self, day_of_the_week, before_or_after, relative_to, time):
+        self.day_of_the_week = day_of_the_week
+        self.before_or_after = before_or_after
+        self.relative_to = relative_to
+        self.time = time
+
+    @classmethod
+    def parse(cls, s):
+        s = s.lower()
+        s, time = _parse_and_remove_time(s)
+
+        s = s.replace(",", " ")
+        s = s.replace(" or ", " ")
+
+        match = re.match(r"^first ([\w ]+) (after|before) ([\w\.]+)$", s)
+
+        if not match:
+            raise _MatchError("Did not match.")
+
+        day_of_the_week_raw, before_or_after, relative_to = match.groups()
+        day_of_the_week = _parse_day_of_the_week(day_of_the_week_raw)
+
+        return cls(day_of_the_week, before_or_after, relative_to, time)
+
+    def resolve(self, universe, date_context):
+        sign = 1 if self.before_or_after == "after" else -1
+        delta = datetime.timedelta(days=sign)
+
+        cursor_date = universe[self.relative_to] + delta
+
+        while cursor_date.weekday() not in self.day_of_the_week:
+            cursor_date += delta
+
+        return _combine_date_and_time(cursor_date, self.time)
+
+
+class _DayOfGivenWeekNode:
+    """A node representing a day in a given week.
+
+    Parameters
+    ----------
+    day_of_the_week : DaysOfTheWeek
+        The day of the week.
+    week_number : int
+        The week number.
+    time : Optional[datetime.time]
+        The time. If ``None``, the result will be inferred from referred field
+        (if it is a datetime field) or will not have a time component (if the referred
+        field is just a date).
+
+    """
+
+    def __init__(self, day_of_the_week, week_number, time):
+        self.day_of_the_week = day_of_the_week
+        self.week_number = week_number
+        self.time = time
+
+    @classmethod
+    def parse(cls, s):
+        s = s.lower()
+        s, time = _parse_and_remove_time(s)
+
+        match = re.match(r"([\w]+) of week (\d+)$", s)
+
+        if not match:
+            raise _MatchError(f"Invalid week reference: {s}")
+
+        day_of_the_week_string, week_string = match.groups()
+        day_of_the_week = getattr(_DaysOfTheWeek, day_of_the_week_string.upper())
+
+        return cls(
+            day_of_the_week=day_of_the_week, week_number=int(week_string), time=time
         )
 
-    if long_match:
-        number, hours_or_days, before_or_after, variable = long_match.groups()
-        factor = -1 if before_or_after == "before" else 1
+    def resolve(self, universe, date_context):
+        # get the first day of the week referenced by the smart date
+        week_start = date_context.start_of_week_one + datetime.timedelta(
+            weeks=self.week_number - 1
+        )
+
+        cursor_date = week_start
+        while cursor_date.weekday() != self.day_of_the_week:
+            cursor_date += datetime.timedelta(days=1)
+
+        return _combine_date_and_time(cursor_date, self.time)
+
+
+def _parse(s):
+    """Parse a smart date into a node, inferring the node type by guess and check."""
+    node_types = [
+        _DateNode,
+        _DirectReferenceNode,
+        _DeltaReferenceNode,
+        _FirstAvailableNode,
+        _DayOfGivenWeekNode,
+    ]
+
+    for NodeType in node_types:
+        try:
+            node = NodeType.parse(s)
+        except _MatchError:
+            pass
+        else:
+            # we've found the right type of node
+            return node
     else:
-        raise ValidationError(f"Invalid relative date string {s}.")
-
-    if hours_or_days == "hour":
-        timedelta_kwargs = {"hours": factor * int(number)}
-    else:
-        timedelta_kwargs = {"days": factor * int(number)}
-
-    delta = datetime.timedelta(**timedelta_kwargs)
-    return _RelativeDateRule(delta=delta, relative_to=variable, time=time)
+        # we tried everything and nothing worked
+        raise ValidationError(f"The smart date string is invalid: {s}")
 
 
-def _parse_relative_day_of_the_week_rule(s):
-    match = re.match(r"^(\w+) (after|before) ([\w\.]+)$", s)
-    match_with_time = re.match(
-        r"^(\w+) (after|before) ([\w\.]+) at (\d{2}):(\d{2}):(\d{2})$", s
-    )
-
-    if not (match or match_with_time):
-        raise ValidationError("Does not match.")
-
-    if match:
-        day_of_the_week_raw, direction, variable = match.groups()
-        time = None
-    elif match_with_time:
-        day_of_the_week_raw, direction, variable, *time_raw = match_with_time.groups()
-        time = datetime.time(*[int(x) for x in time_raw])
-
-    try:
-        day_of_the_week = getattr(_DaysOfTheWeek, day_of_the_week_raw.upper())
-    except AttributeError:
-        raise ValidationError("Invalid day of the week.")
-
-    return _RelativeDayOfTheWeekRule(
-        day_of_the_week=day_of_the_week,
-        direction=direction,
-        relative_to=variable,
-        time=time,
-    )
-
-
-def _parse_week_rule(s):
-    s = s.lower()
-    short_match = re.match(r"([\w]+) of week (\d+)$", s)
-    long_match = re.match(r"([\w]+) of week (\d+) at (\d{2}):(\d{2}):(\d{2})$", s)
-
-    if not (short_match or long_match):
-        raise ValidationError(f"Invalid week reference: {s}")
-
-    if short_match:
-        day_of_the_week_string, week_string = short_match.groups()
-        time = None
-    if long_match:
-        day_of_the_week_string, week_string, h_str, m_str, s_str = long_match.groups()
-        time = datetime.time(int(h_str), int(m_str), int(s_str))
-
-    try:
-        day_of_the_week = getattr(_DaysOfTheWeek, day_of_the_week_string.upper())
-    except AttributeError:
-        raise ValidationError(f"Invalid weekday: {day_of_the_week}")
-
-    return _WeekRule(
-        day_of_the_week=day_of_the_week, week_number=int(week_string), time=time
-    )
-
-
-def _topologically_sort_date_rules(rules):
-    """Topologically sort rules based on their dependencies."""
+def _topological_sort(nodes):
+    """Topologically sort nodes based on their dependencies."""
 
     start = {}
     finish = {}
@@ -162,107 +309,38 @@ def _topologically_sort_date_rules(rules):
     def _dfs(source, clock):
         clock += 1
         start[source] = clock
-        if isinstance(
-            rules.get(source, None), (_RelativeDateRule, _RelativeDayOfTheWeekRule)
-        ):
-            child = rules[source].relative_to
+
+        if source in nodes and hasattr(nodes[source], "relative_to"):
+            child = nodes[source].relative_to
             if (child in start) and (child not in finish):
                 raise ValidationError("The smart date references are cyclical.")
             _dfs(child, clock)
+
         clock += 1
         finish[source] = clock
         return clock
 
     clock = 0
-    for rule in rules:
-        if rule not in finish:
-            clock = _dfs(rule, clock)
+    for key in nodes:
+        if key not in finish:
+            clock = _dfs(key, clock)
 
     reverse_sorted = sorted(finish.keys(), key=lambda x: finish[x], reverse=True)
-    return list(x for x in reverse_sorted if x in rules)
+    return list(x for x in reverse_sorted if x in nodes)
 
 
-def _recurring_days_of_the_week(weekdays, starting_on):
-    """Generator that yields recurring weekdays.
-
-    Parameters
-    ----------
-    weekdays : Collection[Union[int, _DaysOfTheWeek]]
-        A collection of days of the week (or integers, where Monday == 0).
-    starting_on : datetime.date
-        The starting date.
-
-    Yields
-    ------
-    datetime.date
-        The date of the next weekday in ``weekdays``.
-
-    """
-    current_date = starting_on
-    while True:
-        if current_date.weekday() in weekdays:
-            yield current_date
-        current_date += datetime.timedelta(days=1)
-
-
-def _resolve_week_rule(rule, start_date):
-    if start_date is None:
-        raise RuntimeError("The start date is not set, but a smart date refers to it.")
-
-    # get the start of the week reference by the rule
-    week_start_date = start_date + datetime.timedelta(weeks=rule.week_number - 1)
-
-    # get the next rule.day_of_the_week
-    date = next(_recurring_days_of_the_week({rule.day_of_the_week}, week_start_date))
-
-    if rule.time is not None:
-        return datetime.datetime.combine(date, rule.time)
-    else:
-        return date
-
-
-def _resolve_relative_day_of_the_week_rule(rule, universe):
-    if rule.direction == "after":
-        sign = 1
-    else:
-        sign = -1
-
-    delta = datetime.timedelta(days=sign)
-    current_date = universe[rule.relative_to] + delta
-    while True:
-        if current_date.weekday() == rule.day_of_the_week:
-            break
-        current_date += delta
-
-    if rule.time is not None:
-        return datetime.datetime.combine(current_date, rule.time)
-    else:
-        return current_date
-
-
-def _resolve_relative_date_rule(rule, universe):
-    try:
-        date = universe[rule.relative_to] + rule.delta
-    except KeyError:
-        raise ValidationError(f"Relative rule wants unknown field: {rule.relative_to}")
-
-    if rule.time is not None:
-        return datetime.datetime.combine(date, rule.time)
-    else:
-        return date
-
-
-def resolve_smart_dates(smart_dates, universe, date_context=None):
-    """Parses the natural language "smart dates" in a dictionary.
+def resolve_smart_dates(smart_dates, date_context=None):
+    """Converts the natural language "smart dates" to datetime objects.
 
     Parameters
     ----------
     smart_dates : dict
         A dictionary whose values are smart date strings or datetime/date
         objects. The smart dates may depend on one another, or on values in the
-        universe.
-    universe : dict
-        A dictionary whose values are dates that the smart dates may refer to.
+        date context.
+    date_context : DateContext
+        A context used in the resolution of smart dates. If None, an "empty"
+        DateContext is created.
 
     Returns
     -------
@@ -274,48 +352,16 @@ def resolve_smart_dates(smart_dates, universe, date_context=None):
     if date_context is None:
         date_context = DateContext()
 
-    universe = universe.copy()
-    if date_context.previous is not None:
-        for k, v in date_context.previous.metadata.items():
-            universe["previous.metadata." + k] = v
+    # the universe is the set of all known dates
+    universe = {} if date_context.known is None else date_context.known.copy()
 
-    # a helper function to parse a smart string, or maybe a date
-    def _parse(s):
-        if isinstance(s, (datetime.date, datetime.datetime)):
-            return s
+    # parse each smart date
+    nodes = {k: _parse(v) for k, v in smart_dates.items()}
+    order = _topological_sort(nodes)
 
-        try:
-            return _parse_relative_date_rule(s)
-        except ValidationError:
-            pass
-
-        try:
-            return _parse_week_rule(s)
-        except ValidationError:
-            pass
-
-        try:
-            return _parse_relative_day_of_the_week_rule(s)
-        except ValidationError:
-            pass
-
-        raise ValidationError(f"Cannot parse smart date: {s}")
-
-    rules = {k: _parse(v) for k, v in smart_dates.items()}
-    order = _topologically_sort_date_rules(rules)
-
-    # update the universe by resolving the smart dates
+    # update the universe by resolving the nodes
     for key in order:
-        rule = rules[key]
-
-        if isinstance(rule, _RelativeDateRule):
-            universe[key] = _resolve_relative_date_rule(rule, universe)
-        elif isinstance(rule, _RelativeDayOfTheWeekRule):
-            universe[key] = _resolve_relative_day_of_the_week_rule(rule, universe)
-        elif isinstance(rule, _WeekRule):
-            universe[key] = _resolve_week_rule(rule, date_context.start_date)
-        else:
-            # the rule is just a datetime or date object
-            universe[key] = rule
+        node = nodes[key]
+        universe[key] = node.resolve(universe, date_context)
 
     return {k: universe[k] for k in smart_dates}

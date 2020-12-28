@@ -121,10 +121,16 @@ def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path, date_conte
             return False
 
     smart_dates = {k: v for k, v in metadata.items() if _is_smart_date(k)}
-    universe = {k: v for k, v in metadata.items() if not _is_smart_date(k)}
+
+    known = {} if date_context.known is None else date_context.known.copy()
+    for k, v in metadata.items():
+        if not _is_smart_date(k):
+            known[k] = v
+
+    date_context = date_context._replace(known=known)
 
     try:
-        resolved = resolve_smart_dates(smart_dates, universe, date_context)
+        resolved = resolve_smart_dates(smart_dates, date_context)
     except ValidationError as exc:
         raise DiscoveryError(str(exc), path)
 

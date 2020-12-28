@@ -967,7 +967,6 @@ def test_read_publication_with_relative_dates_in_metadata_without_offset(write_f
     assert publication.metadata["released"] == expected
 
 
-
 def test_read_publication_with_date_relative_to_week(write_file):
     # given
     path = write_file(
