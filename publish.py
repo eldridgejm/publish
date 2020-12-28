@@ -812,7 +812,7 @@ def _resolve_week_rule(rule, start_date):
 
 
 
-def _resolve_smart_dates(smart_dates, universe, start_date=None):
+def _resolve_smart_dates(smart_dates, universe, date_context=None):
     """Parses the natural language "smart dates" in a dictionary.
 
     Parameters
@@ -831,6 +831,9 @@ def _resolve_smart_dates(smart_dates, universe, start_date=None):
         datetime or date objects.
 
     """
+    if date_context is None:
+        date_context = DateContext()
+
     universe = universe.copy()
 
     # a helper function to parse a smart string, or maybe a date
@@ -865,7 +868,7 @@ def _resolve_smart_dates(smart_dates, universe, start_date=None):
                     f"Relative rule wants unknown field: {rule.relative_to}"
                 )
         elif isinstance(rule, _WeekRule):
-            universe[key] = _resolve_week_rule(rule, start_date)
+            universe[key] = _resolve_week_rule(rule, date_context.start_date)
         else:
             # the rule is just a datetime or date object
             universe[key] = rule
@@ -873,7 +876,7 @@ def _resolve_smart_dates(smart_dates, universe, start_date=None):
     return {k: universe[k] for k in smart_dates}
 
 
-def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path, start_date):
+def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path, date_context):
     def _is_smart_date(k):
         try:
             return metadata_schema[k]["type"] in {"smartdate", "smartdatetime"}
@@ -884,7 +887,7 @@ def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path, start_date
     universe = {k: v for k, v in metadata.items() if not _is_smart_date(k)}
 
     try:
-        resolved = _resolve_smart_dates(smart_dates, universe, start_date)
+        resolved = _resolve_smart_dates(smart_dates, universe, date_context)
     except ValidationError as exc:
         raise DiscoveryError(str(exc), path)
 
@@ -895,7 +898,7 @@ def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path, start_date
     return result
 
 
-def _resolve_smart_dates_in_release_time(release_time, metadata, path, start_date):
+def _resolve_smart_dates_in_release_time(release_time, metadata, path, date_context):
     # the release time can be None, or a datetime object
     if not isinstance(release_time, str):
         return release_time
@@ -906,7 +909,7 @@ def _resolve_smart_dates_in_release_time(release_time, metadata, path, start_dat
     universe = {"metadata." + k: v for k, v in metadata.items()}
 
     try:
-        resolved = _resolve_smart_dates(smart_dates, universe, start_date)["release_time"]
+        resolved = _resolve_smart_dates(smart_dates, universe, date_context)["release_time"]
     except ValidationError as exc:
         raise DiscoveryError(str(exc), path)
 
@@ -916,7 +919,20 @@ def _resolve_smart_dates_in_release_time(release_time, metadata, path, start_dat
     return resolved
 
 
-def read_publication_file(path, schema=None, start_date=None):
+class DateContext(typing.NamedTuple):
+    """A context used to evaluate relative dates.
+
+    Attributes
+    ----------
+    start_date : Optional[datetime.date]
+        What should be considered the start of "week 1". If None, smart dates referring
+        to weeks cannot be used.
+
+    """
+    start_date: typing.Optional[datetime.date] = None
+
+
+def read_publication_file(path, schema=None, date_context=None):
     """Read a :class:`Publication` from a yaml file.
 
     Parameters
@@ -926,9 +942,8 @@ def read_publication_file(path, schema=None, start_date=None):
     schema : Optional[Schema]
         A schema for validating the publication. Default: None, in which case the
         publication's metadata are not validated.
-    start_date : Optional[datetime.date]
-        What should be considered the start of "week 1". If None, smart dates referring
-        to weeks cannot be used.
+    date_context : Optional[DateContext]
+        A context used to evaluate smart dates. If None, no context is provided.
 
     Returns
     -------
@@ -960,6 +975,9 @@ def read_publication_file(path, schema=None, start_date=None):
 
 
     """
+    if date_context is None:
+        date_context = DateContext()
+
     with path.open() as fileobj:
         contents = yaml.load(fileobj, Loader=yaml.Loader)
 
@@ -1002,7 +1020,7 @@ def read_publication_file(path, schema=None, start_date=None):
 
     if hasattr(schema, "metadata_schema"):
         metadata = _resolve_smart_dates_in_metadata(
-            metadata, schema.metadata_schema, path, start_date=start_date
+            metadata, schema.metadata_schema, path, date_context
         )
 
     # convert each artifact to an Artifact object
@@ -1010,7 +1028,7 @@ def read_publication_file(path, schema=None, start_date=None):
     for key, definition in validated["artifacts"].items():
         # handle relative release times
         definition["release_time"] = _resolve_smart_dates_in_release_time(
-            definition["release_time"], metadata, path, start_date=start_date
+            definition["release_time"], metadata, path, date_context
         )
 
         # if no file is provided, use the key
@@ -1021,7 +1039,7 @@ def read_publication_file(path, schema=None, start_date=None):
 
     # handle publication release time
     release_time = _resolve_smart_dates_in_release_time(
-        validated["release_time"], metadata, path, start_date=start_date
+        validated["release_time"], metadata, path, date_context
     )
 
     publication = Publication(

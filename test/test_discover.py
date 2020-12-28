@@ -1023,8 +1023,10 @@ def test_resolve_smart_dates_with_week_reference():
         "graded": "5 days after due",
     }
 
+    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
+
     # when
-    resolved = publish._resolve_smart_dates(smart_dates, universe={}, start_date=datetime.date(2021, 1, 15))
+    resolved = publish._resolve_smart_dates(smart_dates, universe={}, date_context=date_context)
 
     # then
     resolved['due'] == datetime.date(2021, 1, 19)
@@ -1080,8 +1082,12 @@ def test_read_publication_with_date_relative_to_week(write_file):
         },
     )
 
+    date_context = publish.DateContext(
+            start_date=datetime.date(2021, 1, 11)
+            )
+
     # when
-    publication = publish.read_publication_file(path, schema=schema, start_date=datetime.date(2021, 1, 11))
+    publication = publish.read_publication_file(path, schema=schema, date_context=date_context)
 
     # then
     assert publication.metadata["due"] == datetime.date(2021, 1, 13)
