@@ -376,7 +376,7 @@ def _discover_bfs(
                 queue.append(node)
 
 
-def discover(
+def _discover_old(
     input_directory: pathlib.Path,
     skip_directories: typing.Optional[typing.Collection[str]] = None,
     callbacks: typing.Optional[DiscoverCallbacks] = None,
@@ -476,5 +476,109 @@ def discover(
     _discover_bfs(
         initial_node, make_collection, make_publication, skip_directories, callbacks
     )
+
+    return Universe(collections)
+
+
+def _is_collection(path):
+    return (path / constants.COLLECTION_FILE).is_file()
+
+
+def _is_publication(path):
+    return (path / constants.PUBLICATION_FILE).is_file()
+
+
+def _search_for_collections_and_publications(
+    input_directory: pathlib.Path, skip_directories=None
+):
+    if skip_directories is None:
+        skip_directories = set()
+
+    queue = deque([(input_directory, None)])
+
+    collections = []
+    publications = {}
+
+    while queue:
+        current_path, parent_collection_path = queue.pop()
+
+        if _is_collection(current_path):
+            collections.append(current_path)
+            parent_collection_path = current_path
+
+        if _is_publication(current_path):
+            publications[current_path] = parent_collection_path
+
+        for subpath in current_path.iterdir():
+            if subpath.is_dir():
+                if subpath.name in skip_directories:
+                    continue
+                queue.append((subpath, parent_collection_path))
+
+    return collections, publications
+
+
+def _make_default_collection():
+    default_schema = Schema(
+        required_artifacts=[], metadata_schema=None, allow_unspecified_artifacts=True,
+    )
+    return Collection(schema=default_schema, publications={})
+
+
+def _make_collection(path):
+    """Called when a new collection is discovered. Creates/returns collection."""
+
+    # create the collection
+    collection_file = path / constants.COLLECTION_FILE
+    new_collection = read_collection_file(collection_file)
+
+    return new_collection
+
+
+def _make_publication(path, parent_collection, parent_collection_path):
+    """Called when a new publication is discovered."""
+
+    # read the publication file
+    publication_file = path / constants.PUBLICATION_FILE
+
+    try:
+        publication = read_publication_file(
+            publication_file, schema=parent_collection.schema
+        )
+    except ValidationError as exc:
+        raise DiscoveryError(str(exc), publication_file)
+
+    key = str(path.relative_to(parent_collection_path))
+    parent_collection.publications[key] = publication
+
+
+
+def discover(
+    input_directory: pathlib.Path,
+    skip_directories: typing.Optional[typing.Collection[str]] = None,
+    callbacks: typing.Optional[DiscoverCallbacks] = None,
+):
+
+    default_collection = _make_default_collection()
+
+    collection_paths, publication_paths = _search_for_collections_and_publications(
+        input_directory, skip_directories=skip_directories
+    )
+
+    collections = {p: _make_collection(p) for p in collection_paths}
+
+    for publication_path, parent_collection_path in publication_paths.items():
+        if parent_collection_path is None:
+            parent_collection = default_collection
+            parent_collection_path = input_directory
+        else:
+            parent_collection = collections[parent_collection_path]
+
+        _make_publication(publication_path, parent_collection, parent_collection_path)
+
+    collections = {
+        str(k.relative_to(input_directory)): v for k, v in collections.items()
+    }
+    collections["default"] = default_collection
 
     return Universe(collections)

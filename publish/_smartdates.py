@@ -209,7 +209,7 @@ def _topological_sort(nodes):
     # we must reverse the "relative_to" direction for the toposort.
     children = {k: [] for k in nodes}
     for key, node in nodes.items():
-        if hasattr(node, 'relative_to') and node.relative_to in nodes:
+        if hasattr(node, "relative_to") and node.relative_to in nodes:
             children[node.relative_to].append(key)
 
     def _dfs(source, clock):

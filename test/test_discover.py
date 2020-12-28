@@ -147,7 +147,7 @@ def test_discover_skip_directories():
     universe = publish.discover(EXAMPLE_1_DIRECTORY, skip_directories={"textbook"})
 
     # then
-    assert "textbook" not in universe.collections["default"]
+    assert "textbook" not in universe.collections["default"].publications
 
 
 def test_discover_without_file_uses_key():
