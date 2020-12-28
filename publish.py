@@ -371,6 +371,10 @@ class Publication(typing.NamedTuple):
         The artifacts contained in the publication.
     metadata: Dict[str, Any]
         The metadata dictionary.
+    ready: Optional[bool]
+        If False, this publication is not ready and will not be published.
+    release_time: Optional[datetime.datetime]
+        The time before which this publication will not be released.
 
     """
 
@@ -677,10 +681,16 @@ class _RelativeDateRule(typing.NamedTuple):
     relative_to: str
 
 
+class _RelativeDayOfTheWeekRule(typing.NamedTuple):
+    relative_to: str
+    direction: str
+    day_of_the_week: DaysOfTheWeek
+
+
 class _WeekRule(typing.NamedTuple):
     week_number: int
     day_of_the_week: DaysOfTheWeek
-    time = None
+    time: typing.Optional[datetime.time] = None
 
 
 def _parse_relative_date_rule(s):
@@ -732,21 +742,42 @@ def _parse_relative_date_rule(s):
     return _RelativeDateRule(delta=delta, relative_to=variable)
 
 
-def _parse_week_rule(s):
-    s = s.lower()
-    match = re.match(r'([\w]+) of week (\d+)$', s)
+def _parse_relative_day_of_the_week_rule(s):
+    match = re.match(r"^(\w+) (after|before) ([\w\.]+)$", s)
 
     if not match:
+        raise ValidationError('Does not match.')
+
+    day_of_the_week_raw, direction, variable = match.groups()
+    try:
+        day_of_the_week = getattr(DaysOfTheWeek, day_of_the_week_raw.upper())
+    except AttributeError:
+        raise ValidationError('Invalid day of the week.')
+
+    return _RelativeDayOfTheWeekRule(day_of_the_week=day_of_the_week, direction=direction, relative_to=variable)
+
+
+def _parse_week_rule(s):
+    s = s.lower()
+    short_match = re.match(r'([\w]+) of week (\d+)$', s)
+    long_match = re.match(r'([\w]+) of week (\d+) at (\d{2}):(\d{2}):(\d{2})$', s)
+
+    if not (short_match or long_match):
         raise ValidationError(f"Invalid week reference: {s}")
 
-    day_of_the_week_string, week_string = match.groups()
+    if short_match:
+        day_of_the_week_string, week_string = short_match.groups()
+        time = None
+    if long_match:
+        day_of_the_week_string, week_string, h_str, m_str, s_str = long_match.groups()
+        time = datetime.time(int(h_str), int(m_str), int(s_str))
 
     try:
         day_of_the_week = getattr(DaysOfTheWeek, day_of_the_week_string.upper())
     except AttributeError:
         raise ValidationError(f"Invalid weekday: {day_of_the_week}")
 
-    return _WeekRule(day_of_the_week=day_of_the_week, week_number=int(week_string))
+    return _WeekRule(day_of_the_week=day_of_the_week, week_number=int(week_string), time=time)
 
 
 def _topologically_sort_date_rules(rules):
@@ -758,7 +789,7 @@ def _topologically_sort_date_rules(rules):
     def _dfs(source, clock):
         clock += 1
         start[source] = clock
-        if isinstance(rules.get(source, None), _RelativeDateRule):
+        if isinstance(rules.get(source, None), (_RelativeDateRule, _RelativeDayOfTheWeekRule)):
             child = rules[source].relative_to
             if (child in start) and (child not in finish):
                 raise ValidationError("The smart date references are cyclical.")
@@ -808,7 +839,36 @@ def _resolve_week_rule(rule, start_date):
     week_start_date = start_date + datetime.timedelta(weeks=rule.week_number - 1)
 
     # get the next rule.day_of_the_week
-    return next(_recurring_days_of_the_week({rule.day_of_the_week}, week_start_date))
+    date = next(_recurring_days_of_the_week({rule.day_of_the_week}, week_start_date))
+
+    if rule.time is not None:
+        return datetime.datetime.combine(date, rule.time)
+    else:
+        return date
+
+
+def _resolve_relative_day_of_the_week_rule(rule, universe):
+    if rule.direction == 'after':
+        sign = 1
+    else:
+        sign = -1
+
+    delta = datetime.timedelta(days=sign)
+
+    current_date = universe[rule.relative_to]
+    while True:
+        if current_date.weekday() == rule.day_of_the_week:
+            return current_date
+        current_date += delta
+
+
+def _resolve_relative_date_rule(rule, universe):
+    try:
+        return universe[rule.relative_to] + rule.delta
+    except KeyError:
+        raise ValidationError(
+            f"Relative rule wants unknown field: {rule.relative_to}"
+        )
 
 
 
@@ -835,6 +895,10 @@ def _resolve_smart_dates(smart_dates, universe, date_context=None):
         date_context = DateContext()
 
     universe = universe.copy()
+    if (date_context.previous is not None):
+        for k, v in date_context.previous.metadata.items():
+            universe['previous.metadata.' + k] = v
+
 
     # a helper function to parse a smart string, or maybe a date
     def _parse(s):
@@ -851,6 +915,11 @@ def _resolve_smart_dates(smart_dates, universe, date_context=None):
         except ValidationError:
             pass
 
+        try:
+            return _parse_relative_day_of_the_week_rule(s)
+        except ValidationError:
+            pass
+
         raise ValidationError(f"Cannot parse smart date: {s}")
 
     rules = {k: _parse(v) for k, v in smart_dates.items()}
@@ -861,12 +930,9 @@ def _resolve_smart_dates(smart_dates, universe, date_context=None):
         rule = rules[key]
 
         if isinstance(rule, _RelativeDateRule):
-            try:
-                universe[key] = universe[rule.relative_to] + rule.delta
-            except KeyError:
-                raise ValidationError(
-                    f"Relative rule wants unknown field: {rule.relative_to}"
-                )
+            universe[key] = _resolve_relative_date_rule(rule, universe)
+        elif isinstance(rule, _RelativeDayOfTheWeekRule):
+            universe[key] = _resolve_relative_day_of_the_week_rule(rule, universe)
         elif isinstance(rule, _WeekRule):
             universe[key] = _resolve_week_rule(rule, date_context.start_date)
         else:
@@ -927,9 +993,12 @@ class DateContext(typing.NamedTuple):
     start_date : Optional[datetime.date]
         What should be considered the start of "week 1". If None, smart dates referring
         to weeks cannot be used.
+    previous : Publication
+        The previous publication, if there is one.
 
     """
     start_date: typing.Optional[datetime.date] = None
+    previous: typing.Optional[Publication] = None
 
 
 def read_publication_file(path, schema=None, date_context=None):
