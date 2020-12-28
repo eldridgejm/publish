@@ -1086,6 +1086,46 @@ def test_resolve_smart_dates_with_weekday_references_after():
     assert resolved['graded'] == datetime.date(2021, 1, 31)
 
 
+@mark.private
+def test_resolve_smart_dates_with_weekday_references_before_excludes_current_day():
+    # given
+    smart_dates = {
+        "due": "tuesday of week 02",
+        "released": "tuesday before due", # <----- this is what we're testing
+        "graded": "5 days after due",
+    }
+    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
+
+    # when
+    resolved = publish._resolve_smart_dates(smart_dates, universe={}, date_context=date_context)
+
+    # then
+    assert resolved['due'] == datetime.date(2021, 1, 26)
+    assert resolved['released'] == datetime.date(2021, 1, 19)
+    assert resolved['graded'] == datetime.date(2021, 1, 31)
+
+
+@mark.private
+def test_resolve_smart_dates_with_weekday_references_after_excludes_current_day():
+    # given
+    smart_dates = {
+        "due": "tuesday of week 02",
+        "released": "tuesday after due", # <----- this is what we're testing
+        "graded": "5 days after due",
+    }
+    date_context = publish.DateContext(start_date=datetime.date(2021, 1, 15))
+
+    # when
+    resolved = publish._resolve_smart_dates(smart_dates, universe={}, date_context=date_context)
+
+    # then
+    assert resolved['due'] == datetime.date(2021, 1, 26)
+    assert resolved['released'] == datetime.date(2021, 2, 2)
+    assert resolved['graded'] == datetime.date(2021, 1, 31)
+
+
+
+
 def test_read_publication_with_date_relative_to_week(write_file):
     # given
     path = write_file(
@@ -1221,3 +1261,41 @@ def test_read_publication_with_previous_dates(write_file):
     # then
     assert publication.metadata["due"] == datetime.datetime(2021, 1, 22, 0, 0, 0)
     assert publication.metadata["released"] == datetime.datetime(2021, 1, 15, 0, 0, 0)
+
+
+
+def test_read_publication_with_unknown_relative_field_raises(write_file):
+    # given
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-12-01
+                released: 7 days before duedate # <---- this field doesn't exist
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 2020-01-02 23:59:00
+            """
+        ),
+    )
+
+    schema = publish.Schema(
+        required_artifacts=["homework", "solution"],
+        metadata_schema={
+            "name": {"type": "string"},
+            "due": {"type": "date"},
+            "released": {"type": "smartdate"},
+        },
+    )
+
+    # when
+    with raises(publish.DiscoveryError):
+        publication = publish.read_publication_file(path, schema=schema)

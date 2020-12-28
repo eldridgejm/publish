@@ -854,8 +854,7 @@ def _resolve_relative_day_of_the_week_rule(rule, universe):
         sign = -1
 
     delta = datetime.timedelta(days=sign)
-
-    current_date = universe[rule.relative_to]
+    current_date = universe[rule.relative_to] + delta
     while True:
         if current_date.weekday() == rule.day_of_the_week:
             return current_date
