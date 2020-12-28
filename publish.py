@@ -657,64 +657,6 @@ def read_collection_file(path):
     return Collection(schema=schema, publications={})
 
 
-def _parse_release_time(s, metadata):
-    """Convert a string like '1 day after metadata.due' to a datetime.
-
-    Also works with hours: "3 hours after metadata.due"
-    
-    Parameters
-    ----------
-    s
-        A time, maybe in the format of a string, but also possibly None or a datetime.
-        If it isn't a string, the function simply returns s. This is useful if
-        s is None, for instance.
-    metadata : dict
-        The metadata dictionary used to look up the reference date.
-
-    Returns
-    -------
-    datetime.datetime or None
-        The release time.
-
-    Raises
-    ------
-    ValidationError
-        If the relative date string format is incorrect.
-
-    """
-    if not isinstance(s, str):
-        return s
-
-    short_match = re.match(r"metadata\.(\w+)$", s)
-    long_match = re.match(
-        r"^(\d+) (hour|day)[s]{0,1} (after|before) metadata\.(\w+)$", s
-    )
-
-    if short_match:
-        [variable] = short_match.groups()
-        factor = 1
-        number = 0
-        hours_or_days = "day"
-    elif long_match:
-        number, hours_or_days, before_or_after, variable = long_match.groups()
-        factor = -1 if before_or_after == "before" else 1
-    else:
-        raise ValueError("Invalid relative date string.")
-
-    if variable not in metadata or not isinstance(
-        metadata[variable], datetime.datetime
-    ):
-        raise ValueError(f"Invalid reference variable '{variable}'. Not a datetime.")
-
-    if hours_or_days == "hour":
-        timedelta_kwargs = {"hours": factor * int(number)}
-    else:
-        timedelta_kwargs = {"days": factor * int(number)}
-
-    delta = datetime.timedelta(**timedelta_kwargs)
-    return metadata[variable] + delta
-
-
 class _RelativeDateRule(typing.NamedTuple):
     delta: datetime.timedelta
     relative_to: str
@@ -747,7 +689,12 @@ def _parse_relative_date_rule(s):
         The rule read from the text.
 
     """
-    long_match = re.match(r"^(\d+) (hour|day)[s]{0,1} (after|before) (\w+)$", s)
+    short_match = re.match(r"([\w\.]+)$", s)
+    long_match = re.match(r"^(\d+) (hour|day)[s]{0,1} (after|before) ([\w\.]+)$", s)
+
+    if short_match:
+        variable = short_match.groups()[0]
+        return _RelativeDateRule(delta=datetime.timedelta(days=0), relative_to=variable)
 
     if long_match:
         number, hours_or_days, before_or_after, variable = long_match.groups()
@@ -831,7 +778,12 @@ def _resolve_smart_dates(smart_dates, universe):
         rule = rules[key]
 
         if isinstance(rule, _RelativeDateRule):
-            universe[key] = universe[rule.relative_to] + rule.delta
+            try:
+                universe[key] = universe[rule.relative_to] + rule.delta
+            except KeyError:
+                raise ValidationError(
+                    f"Relative rule wants unknown field: {rule.relative_to}"
+                )
         else:
             # the rule is just a datetime or date object
             universe[key] = rule
@@ -839,24 +791,47 @@ def _resolve_smart_dates(smart_dates, universe):
     return {k: universe[k] for k in smart_dates}
 
 
-def _resolve_smart_dates_in_metadata(metadata, metadata_schema):
-
+def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path):
     def _is_smart_date(k):
         try:
-            return metadata_schema[k]['type'] in {'smartdate', 'smartdatetime'}
+            return metadata_schema[k]["type"] in {"smartdate", "smartdatetime"}
         except Exception:
             return False
 
     smart_dates = {k: v for k, v in metadata.items() if _is_smart_date(k)}
     universe = {k: v for k, v in metadata.items() if not _is_smart_date(k)}
 
-    resolved = _resolve_smart_dates(smart_dates, universe)
+    try:
+        resolved = _resolve_smart_dates(smart_dates, universe)
+    except ValidationError as exc:
+        raise DiscoveryError(str(exc), path)
 
     result = metadata.copy()
     for key, value in resolved.items():
         result[key] = value
 
     return result
+
+
+def _resolve_smart_dates_in_release_time(release_time, metadata, path):
+    # the release time can be None, or a datetime object
+    if not isinstance(release_time, str):
+        return release_time
+
+    smart_dates = {"release_time": release_time}
+    # we prepend "metadata." to every key, because the release_time has to reference
+    # things in metadata this way
+    universe = {"metadata." + k: v for k, v in metadata.items()}
+
+    try:
+        resolved = _resolve_smart_dates(smart_dates, universe)["release_time"]
+    except ValidationError as exc:
+        raise DiscoveryError(str(exc), path)
+
+    if not isinstance(resolved, datetime.datetime):
+        raise DiscoveryError("release_time is not a datetime.", path)
+
+    return resolved
 
 
 def read_publication_file(path, schema=None):
@@ -940,19 +915,18 @@ def read_publication_file(path, schema=None):
 
     metadata = validated["metadata"]
 
-    if hasattr(schema, 'metadata_schema'):
-        metadata = _resolve_smart_dates_in_metadata(metadata, schema.metadata_schema)
+    if hasattr(schema, "metadata_schema"):
+        metadata = _resolve_smart_dates_in_metadata(
+            metadata, schema.metadata_schema, path
+        )
 
     # convert each artifact to an Artifact object
     artifacts = {}
     for key, definition in validated["artifacts"].items():
         # handle relative release times
-        try:
-            definition["release_time"] = _parse_release_time(
-                definition["release_time"], metadata
-            )
-        except ValueError as exc:
-            raise DiscoveryError(str(exc), path)
+        definition["release_time"] = _resolve_smart_dates_in_release_time(
+            definition["release_time"], metadata, path
+        )
 
         # if no file is provided, use the key
         if definition["file"] is None:
@@ -961,10 +935,9 @@ def read_publication_file(path, schema=None):
         artifacts[key] = UnbuiltArtifact(workdir=path.parent.absolute(), **definition)
 
     # handle publication release time
-    try:
-        release_time = _parse_release_time(validated["release_time"], metadata)
-    except ValueError as exc:
-        raise DiscoveryError(str(exc), path)
+    release_time = _resolve_smart_dates_in_release_time(
+        validated["release_time"], metadata, path
+    )
 
     publication = Publication(
         metadata=metadata,

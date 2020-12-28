@@ -506,8 +506,9 @@ def test_read_artifact_with_relative_release_time(write_file):
     assert publication.artifacts["solution"].release_time == expected
 
 
-def test_read_artifact_with_relative_release_date_raises(write_file):
+def test_read_artifact_with_relative_release_date_but_no_time_raises(write_file):
     # given
+    # release_time must be a datetime, but it's a date here
     path = write_file(
         "publish.yaml",
         contents=dedent(
@@ -844,7 +845,7 @@ def test_read_artifact_with_absolute_release_time(write_file):
 # --------------------------------------------------------------------------------------
 
 
-def test_read_artifact_with_relative_dates_in_metadata(write_file):
+def test_read_publication_with_relative_dates_in_metadata(write_file):
     # given
     path = write_file(
         "publish.yaml",
