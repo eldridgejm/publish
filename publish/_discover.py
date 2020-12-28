@@ -149,12 +149,15 @@ def _resolve_smart_dates_in_release_time(release_time, metadata, path, date_cont
     smart_dates = {"release_time": release_time}
     # we prepend "metadata." to every key, because the release_time has to reference
     # things in metadata this way
-    universe = {"metadata." + k: v for k, v in metadata.items()}
+
+    known = {} if date_context.known is None else date_context.known.copy()
+    for k, v in metadata.items():
+        known["metadata." + k] = v
+
+    date_context = date_context._replace(known=known)
 
     try:
-        resolved = resolve_smart_dates(smart_dates, universe, date_context)[
-            "release_time"
-        ]
+        resolved = resolve_smart_dates(smart_dates, date_context)["release_time"]
     except ValidationError as exc:
         raise DiscoveryError(str(exc), path)
 
