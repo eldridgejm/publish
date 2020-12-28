@@ -1,0 +1,10 @@
+metadata:
+    name: Homework 01
+    due: 2020-09-10 23:59:00
+    released: 2020-09-01
+
+artifacts:
+    homework.pdf:
+        recipe: touch homework.pdf
+    solution.pdf:
+        recipe: touch solution.pdf

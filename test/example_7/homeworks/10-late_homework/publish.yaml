@@ -1,0 +1,14 @@
+metadata:
+    name: Homework 04
+    due: 2020-09-10 23:59:00
+    released: 2020-09-01
+
+ready: false
+
+artifacts:
+    homework.pdf:
+        recipe: touch homework.pdf
+        ready: false
+    solution.pdf:
+        recipe: mkdir build && touch build/solution.pdf
+        file: ./build/solution.pdf

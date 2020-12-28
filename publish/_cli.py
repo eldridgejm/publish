@@ -8,7 +8,7 @@ from ._build import BuildCallbacks, build
 from ._filter import FilterCallbacks, filter_nodes
 from ._publish import PublishCallbacks, publish
 from ._serialize import serialize
-from .types import UnbuiltArtifact
+from .types import UnbuiltArtifact, DateContext
 
 
 # cli
@@ -71,7 +71,17 @@ def cli(argv=None):
         default=False,
         help="let stdout and stderr through when building artifacts",
     )
-    parser.add_argument("--now",)
+    parser.add_argument(
+        "--start-of-week-one",
+        type=datetime.date.fromisoformat,
+        default=None,
+        help="the start of week one. used for smart dates in publication files."
+    )
+    parser.add_argument("--now",
+            default=None,
+            help="run as if this is the current time"
+            )
+
     args = parser.parse_args(argv)
 
     if args.now is None:
@@ -85,6 +95,10 @@ def cli(argv=None):
 
         def now():
             return _now
+
+    date_context = DateContext()
+    if args.start_of_week_one is not None:
+        date_context = date_context._replace(start_of_week_one=args.start_of_week_one)
 
     # construct callbacks for printing information to the screen. start with
     # helper functions for formatting terminal output
@@ -183,6 +197,7 @@ def cli(argv=None):
     discovered = discover(
         args.input_directory,
         skip_directories=args.skip_directories,
+        date_context=date_context,
         callbacks=CLIDiscoverCallbacks(),
     )
 

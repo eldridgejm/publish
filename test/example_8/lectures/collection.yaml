@@ -1,0 +1,13 @@
+schema:
+    required_artifacts: []
+
+    optional_artifacts:
+        - template.zip
+
+    metadata_schema:
+        name:
+            type: string
+        date: 
+            type: smartdate
+
+    is_ordered: true

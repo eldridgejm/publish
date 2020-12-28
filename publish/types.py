@@ -147,7 +147,7 @@ class Collection(typing.NamedTuple):
     ----------
     schema : Schema
         The schema used to validate the publications within the collection.
-    publications : Dict[str, Publication]
+    publications : Mapping[str, Publication]
         The publications contained in the collection.
 
     """
@@ -227,11 +227,13 @@ class Schema(typing.NamedTuple):
     optional_artifacts : typing.Collection[str], optional
         Names of artifacts that publication are permitted to contain. Default: empty
         list.
-    allow_unspecified_artifacts : bool, optional
-        Is it permissible for a publication to have unknown artifacts? Default: False.
     metadata_schema : Mapping[str, Any], optional
         A dictionary describing a schema used to validate publication metadata. In the
         style of cerberus. If None, no validation will be performed. Default: None.
+    allow_unspecified_artifacts : Optional[Boolean]
+        Is it permissible for a publication to have unknown artifacts? Default: False.
+    is_ordered : Optional[Boolean]
+        Should the publications be considered ordered by their keys? Default: False
 
     """
 
@@ -239,6 +241,7 @@ class Schema(typing.NamedTuple):
     optional_artifacts: typing.Collection[str] = None
     metadata_schema: typing.Mapping[str, typing.Mapping] = None
     allow_unspecified_artifacts: bool = False
+    is_ordered: bool = False
 
 
 class DateContext(typing.NamedTuple):

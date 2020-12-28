@@ -1,0 +1,7 @@
+metadata:
+    name: Textbook
+    author: Justin Eldridge
+
+artifacts:
+    book.pdf:
+        recipe: touch book.pdf

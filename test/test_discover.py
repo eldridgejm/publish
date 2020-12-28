@@ -26,6 +26,12 @@ EXAMPLE_5_DIRECTORY = pathlib.Path(__file__).parent / "example_5"
 # bad: publication metadata doesn't match schema
 EXAMPLE_6_DIRECTORY = pathlib.Path(__file__).parent / "example_6"
 
+# good: ordered collection
+EXAMPLE_7_DIRECTORY = pathlib.Path(__file__).parent / "example_7"
+
+# good: ordered collection with dates relating to previous
+EXAMPLE_8_DIRECTORY = pathlib.Path(__file__).parent / "example_8"
+
 
 def test_discover_finds_collections():
     # when
@@ -162,6 +168,21 @@ def test_discover_without_file_uses_key():
         .file
         == "homework.pdf"
     )
+
+
+def test_discover_sorts_publications_lexicographically_if_collection_is_ordered():
+    # when
+    universe = publish.discover(EXAMPLE_7_DIRECTORY)
+
+    # then
+    assert list(universe.collections["homeworks"].publications) == [
+        "01-intro",
+        "02-python",
+        "03-not_ready",
+        "04-publication_not_released",
+        "10-late_homework",
+        "11-later_homework",
+    ]
 
 
 def test_filter_artifacts():
@@ -1090,3 +1111,21 @@ def test_read_publication_with_unknown_relative_field_raises(write_file):
     # when
     with raises(publish.DiscoveryError):
         publication = publish.read_publication_file(path, schema=schema)
+
+
+def test_discover_with_dates_relating_to_previous():
+    # given
+    date_context = publish.DateContext(start_of_week_one=datetime.date(2021, 1, 4))
+
+    # when
+    universe = publish.discover(EXAMPLE_8_DIRECTORY, date_context=date_context)
+
+    # then
+    publications = universe.collections["lectures"].publications
+
+    assert publications["01-intro"].metadata['date'] == datetime.date(2021, 1, 5)
+    assert publications["02-foo"].metadata['date'] == datetime.date(2021, 1, 7)
+    assert publications["03-bar"].metadata['date'] == datetime.date(2021, 1, 12)
+    # suppose lecture 4 had to be moved; it is manually set in the file
+    assert publications["04-baz"].metadata['date'] == datetime.date(2021, 1, 19)
+    assert publications["05-conclusion"].metadata['date'] == datetime.date(2021, 1, 21)

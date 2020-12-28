@@ -1,0 +1,7 @@
+metadata:
+    name: Lecture 01
+    date: tuesday of week 01
+
+artifacts:
+    template.zip:
+        recipe: touch template.zip

@@ -47,6 +47,24 @@ def test_direct_reference():
     }
 
 
+def test_direct_reference_with_dotted_name():
+    # given
+    smart_dates = {
+        "released": "previous.due",
+    }
+    date_context = publish.DateContext(
+        known={"previous.due": datetime.date(2020, 12, 15),}
+    )
+
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+    # then
+    assert resolved == {
+        "released": datetime.date(2020, 12, 15),
+    }
+
+
 def test_direct_reference_with_time():
     # given
     smart_dates = {
@@ -220,6 +238,25 @@ def test_delta_reference_after_hours():
     # then
     assert resolved == {
         "released": datetime.datetime(2020, 12, 15, 7, 59, 0),
+    }
+
+
+def test_delta_reference_with_dotted_name():
+    # given
+    smart_dates = {
+        "released": "7 days before previous.due",
+    }
+
+    date_context = publish.DateContext(
+        known={"previous.due": datetime.date(2020, 12, 15)}
+    )
+
+    # when
+    resolved = publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+    # then
+    assert resolved == {
+        "released": datetime.date(2020, 12, 8),
     }
 
 
@@ -573,7 +610,7 @@ def test_first_available_raises_if_unknown_day_of_week():
 # e.g., "monday of week 02"
 
 
-def test_day_of_a_given_week():
+def test_day_of_given_week():
     # given
     smart_dates = {
         "released": "tuesday of week 02",
@@ -590,7 +627,7 @@ def test_day_of_a_given_week():
     }
 
 
-def test_day_of_a_given_week_works_without_zero_padding():
+def test_day_of_given_week_works_without_zero_padding():
     # given
     smart_dates = {
         "released": "tuesday of week 2",
@@ -607,7 +644,7 @@ def test_day_of_a_given_week_works_without_zero_padding():
     }
 
 
-def test_day_of_a_given_week_with_time():
+def test_day_of_given_week_with_time():
     # given
     smart_dates = {
         "released": "tuesday of week 02 at 23:00:00",
@@ -627,7 +664,7 @@ def test_day_of_a_given_week_with_time():
 # case sensitivity / insensitivity
 
 
-def test_day_of_a_given_week_case_insensitive():
+def test_day_of_given_week_case_insensitive():
     # given
     smart_dates = {
         "released": "TueSday oF Week 2 AT 23:00:00",
@@ -644,10 +681,21 @@ def test_day_of_a_given_week_case_insensitive():
     }
 
 
-# error handline
+# error handling
 
 
-def test_day_of_a_given_week_case_raises_if_invalid_day_of_week():
+def test_day_of_given_week_case_raises_if_start_is_not_provided():
+    # given
+    smart_dates = {"released": "tersday of week 02"}
+
+    date_context = publish.DateContext()
+
+    # when
+    with raises(publish.ValidationError):
+        publish.resolve_smart_dates(smart_dates, date_context=date_context)
+
+
+def test_day_of_given_week_case_raises_if_invalid_day_of_week():
     # given
     smart_dates = {"released": "tersday of week 02"}
 
@@ -658,7 +706,7 @@ def test_day_of_a_given_week_case_raises_if_invalid_day_of_week():
         publish.resolve_smart_dates(smart_dates, date_context=date_context)
 
 
-def test_day_of_a_given_week_case_raises_if_multiple_days_given():
+def test_day_of_given_week_case_raises_if_multiple_days_given():
     # given
     smart_dates = {"released": "tuesday or thursday of week 02"}
 

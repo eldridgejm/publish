@@ -243,7 +243,7 @@ def _topological_sort(nodes):
 class _DateNode:
     """A non-reference node representing a date/datetime."""
 
-    def __init(self, date):
+    def __init__(self, date):
         self.date = date
 
     @classmethod
@@ -463,6 +463,9 @@ class _DayOfGivenWeekNode:
         )
 
     def resolve(self, universe, date_context):
+        if date_context.start_of_week_one is None:
+            raise ValidationError("Start date of week one was not provided.")
+
         # get the first day of the week referenced by the smart date
         week_start = date_context.start_of_week_one + datetime.timedelta(
             weeks=self.week_number - 1

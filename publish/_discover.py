@@ -2,7 +2,7 @@ import typing
 import datetime
 import pathlib
 import re
-from collections import namedtuple, deque
+from collections import namedtuple, deque, OrderedDict
 
 import cerberus
 import yaml
@@ -86,6 +86,7 @@ def read_collection_file(path):
                         "type": "boolean",
                         "default": False,
                     },
+                    "is_ordered": {"type": "boolean", "default": False,},
                 },
             }
         },
@@ -101,7 +102,7 @@ def read_collection_file(path):
     # make sure that the metadata schema is valid
     if validated_contents["schema"]["metadata_schema"] is not None:
         try:
-            cerberus.Validator(validated_contents["schema"]["metadata_schema"])
+            _PublicationValidator(validated_contents["schema"]["metadata_schema"])
         except Exception as exc:
             raise DiscoveryError("Invalid metadata schema.", path)
 
@@ -448,7 +449,31 @@ def _make_collections(collection_paths, input_directory, callbacks):
     return collections
 
 
-def _make_publications(publication_paths, input_directory, collections, callbacks):
+def _add_previous_keys(date_context, collection):
+    copy = date_context._replace()
+
+    if not collection.schema.is_ordered:
+        return copy
+
+    # the previous publication was just the last one added to collection.publications
+    try:
+        previous_key = list(collection.publications)[-1]
+    except IndexError:
+        return copy
+
+    prev_meta = collection.publications[previous_key].metadata
+
+    known = {} if date_context.known is None else date_context.known.copy()
+    for key, value in prev_meta.items():
+        if isinstance(value, datetime.date):
+            known[f'previous.metadata.{key}'] = value
+
+    return date_context._replace(known=known)
+
+
+def _make_publications(
+    publication_paths, input_directory, collections, *, callbacks, date_context
+):
     """Make the Publication objects.
 
     Parameters
@@ -463,6 +488,8 @@ def _make_publications(publication_paths, input_directory, collections, callback
         Publication objects will be added to these Collection objects in-place.
     callbacks : DiscoverCallbacks
         The callbacks to be invoked when interesting things happen.
+    date_context : DateContext
+        A date context used to evaluate smart dates.
 
     """
     for path, collection_path in publication_paths.items():
@@ -475,30 +502,43 @@ def _make_publications(publication_paths, input_directory, collections, callback
 
         collection = collections[collection_key]
 
+        publication_date_context = _add_previous_keys(date_context, collection)
+
         file_path = path / constants.PUBLICATION_FILE
-        publication = read_publication_file(file_path, schema=collection.schema)
+        publication = read_publication_file(
+            file_path, schema=collection.schema, date_context=publication_date_context
+        )
 
         collection.publications[publication_key] = publication
 
         callbacks.on_publication(file_path)
 
 
-def discover(input_directory, skip_directories=None, callbacks=None):
+def _sort_dictionary(dct):
+    result = OrderedDict()
+    for key in sorted(dct):
+        result[key] = dct[key]
+    return result
+
+
+def discover(input_directory, skip_directories=None, callbacks=None, date_context=None):
     """Discover the collections and publications in the filesystem.
 
     Parameters
     ----------
     input_directory : Path
         The path to the directory that will be recursively searched.
-
     skip_directories : Optional[Collection[str]]
         A collection of directory names that should be skipped if discovered.
         If None, no directories will be skipped.
-
     callbacks : Optional[DiscoverCallbacks]
         Callbacks to be invoked during the discovery. If omitted, no callbacks
         are executed. See :class:`DiscoverCallbacks` for the possible callbacks
         and their arguments.
+    date_context : Optional[DateContext]
+        A date context used to evaluate smart dates. If ``None``, an empty context is
+        used.
+
     Returns
     -------
     Universe
@@ -508,11 +548,22 @@ def discover(input_directory, skip_directories=None, callbacks=None):
     if callbacks is None:
         callbacks = DiscoverCallbacks()
 
+    if date_context is None:
+        date_context = DateContext()
+
     collection_paths, publication_paths = _search_for_collections_and_publications(
         input_directory, skip_directories=skip_directories, callbacks=callbacks
     )
 
+    publication_paths = _sort_dictionary(publication_paths)
+
     collections = _make_collections(collection_paths, input_directory, callbacks)
-    _make_publications(publication_paths, input_directory, collections, callbacks)
+    _make_publications(
+        publication_paths,
+        input_directory,
+        collections,
+        date_context=date_context,
+        callbacks=callbacks,
+    )
 
     return Universe(collections)

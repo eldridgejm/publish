@@ -33,3 +33,14 @@ def test_publish_simple_example(make_input_directory, output_directory):
 
     # then
     assert (output_directory / "homeworks" / "01-intro" / "homework.pdf").exists()
+
+
+def test_publish_with_example_depending_on_week_start_date(make_input_directory, output_directory):
+    # given
+    input_directory = make_input_directory("example_8")
+
+    # when
+    cli([str(input_directory), str(output_directory), '--start-of-week-one', '2020-01-04', '--ignore-release-time'])
+
+    # then
+    assert (output_directory / "lectures" / "01-intro").exists()
