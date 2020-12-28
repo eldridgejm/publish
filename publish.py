@@ -679,12 +679,14 @@ class DaysOfTheWeek(enum.IntEnum):
 class _RelativeDateRule(typing.NamedTuple):
     delta: datetime.timedelta
     relative_to: str
+    time: typing.Optional[datetime.time] = None
 
 
 class _RelativeDayOfTheWeekRule(typing.NamedTuple):
     relative_to: str
     direction: str
     day_of_the_week: DaysOfTheWeek
+    time: typing.Optional[datetime.time] = None
 
 
 class _WeekRule(typing.NamedTuple):
@@ -720,12 +722,25 @@ def _parse_relative_date_rule(s):
         The rule read from the text.
 
     """
+    time_pattern = r" at (\d{2}):(\d{2}):(\d{2})$"
+    match_with_time = re.search(time_pattern, s)
+    if match_with_time:
+        time_raw = match_with_time.groups()
+        time = datetime.time(*[int(x) for x in time_raw])
+        s = re.sub(time_pattern, '', s)
+    else:
+        time = None
+
     short_match = re.match(r"([\w\.]+)$", s)
     long_match = re.match(r"^(\d+) (hour|day)[s]{0,1} (after|before) ([\w\.]+)$", s)
 
+
+    if not (short_match or long_match):
+        raise ValidationError('Did not match.')
+
     if short_match:
         variable = short_match.groups()[0]
-        return _RelativeDateRule(delta=datetime.timedelta(days=0), relative_to=variable)
+        return _RelativeDateRule(delta=datetime.timedelta(days=0), relative_to=variable, time=time)
 
     if long_match:
         number, hours_or_days, before_or_after, variable = long_match.groups()
@@ -739,22 +754,29 @@ def _parse_relative_date_rule(s):
         timedelta_kwargs = {"days": factor * int(number)}
 
     delta = datetime.timedelta(**timedelta_kwargs)
-    return _RelativeDateRule(delta=delta, relative_to=variable)
+    return _RelativeDateRule(delta=delta, relative_to=variable, time=time)
 
 
 def _parse_relative_day_of_the_week_rule(s):
     match = re.match(r"^(\w+) (after|before) ([\w\.]+)$", s)
+    match_with_time = re.match(r"^(\w+) (after|before) ([\w\.]+) at (\d{2}):(\d{2}):(\d{2})$", s)
 
-    if not match:
+    if not (match or match_with_time):
         raise ValidationError('Does not match.')
 
-    day_of_the_week_raw, direction, variable = match.groups()
+    if match:
+        day_of_the_week_raw, direction, variable = match.groups()
+        time = None
+    elif match_with_time:
+        day_of_the_week_raw, direction, variable, *time_raw = match_with_time.groups()
+        time = datetime.time(*[int(x) for x in time_raw])
+
     try:
         day_of_the_week = getattr(DaysOfTheWeek, day_of_the_week_raw.upper())
     except AttributeError:
         raise ValidationError('Invalid day of the week.')
 
-    return _RelativeDayOfTheWeekRule(day_of_the_week=day_of_the_week, direction=direction, relative_to=variable)
+    return _RelativeDayOfTheWeekRule(day_of_the_week=day_of_the_week, direction=direction, relative_to=variable, time=time)
 
 
 def _parse_week_rule(s):
@@ -857,17 +879,27 @@ def _resolve_relative_day_of_the_week_rule(rule, universe):
     current_date = universe[rule.relative_to] + delta
     while True:
         if current_date.weekday() == rule.day_of_the_week:
-            return current_date
+            break
         current_date += delta
+
+    if rule.time is not None:
+        return datetime.datetime.combine(current_date, rule.time)
+    else:
+        return current_date
 
 
 def _resolve_relative_date_rule(rule, universe):
     try:
-        return universe[rule.relative_to] + rule.delta
+        date = universe[rule.relative_to] + rule.delta
     except KeyError:
         raise ValidationError(
             f"Relative rule wants unknown field: {rule.relative_to}"
         )
+
+    if rule.time is not None:
+        return datetime.datetime.combine(date, rule.time)
+    else:
+        return date
 
 
 
