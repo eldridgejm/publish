@@ -221,6 +221,7 @@ import abc
 import argparse
 import copy
 import datetime
+import enum
 import json
 import pathlib
 import re
@@ -508,6 +509,8 @@ class Schema(typing.NamedTuple):
 
 
 class _PublicationValidator(cerberus.Validator):
+    """A subclassed cerberus Validator with special "smart date" data types."""
+
     types_mapping = cerberus.Validator.types_mapping.copy()
 
     types_mapping["smartdate"] = cerberus.TypeDefinition(
@@ -569,7 +572,7 @@ def validate(publication: Publication, against: Schema):
         raise ValidationError(f"Unknown artifacts provided: {provided - optional}.")
 
 
-# discovery
+# read_collection_file
 # --------------------------------------------------------------------------------------
 
 
@@ -656,10 +659,28 @@ def read_collection_file(path):
     schema = Schema(**validated_contents["schema"])
     return Collection(schema=schema, publications={})
 
+# read_publication_file
+# --------------------------------------------------------------------------------------
+
+class DaysOfTheWeek(enum.IntEnum):
+    MONDAY = 0
+    TUESDAY = 1
+    WEDNESDAY = 2
+    THURSDAY = 3
+    FRIDAY = 4
+    SATURDAY = 5
+    SUNDAY = 6
+
 
 class _RelativeDateRule(typing.NamedTuple):
     delta: datetime.timedelta
     relative_to: str
+
+
+class _WeekRule(typing.NamedTuple):
+    week_number: int
+    day_of_the_week: DaysOfTheWeek
+    time = None
 
 
 def _parse_relative_date_rule(s):
@@ -700,7 +721,7 @@ def _parse_relative_date_rule(s):
         number, hours_or_days, before_or_after, variable = long_match.groups()
         factor = -1 if before_or_after == "before" else 1
     else:
-        raise ValidationError("Invalid relative date string.")
+        raise ValidationError(f"Invalid relative date string {s}.")
 
     if hours_or_days == "hour":
         timedelta_kwargs = {"hours": factor * int(number)}
@@ -709,6 +730,23 @@ def _parse_relative_date_rule(s):
 
     delta = datetime.timedelta(**timedelta_kwargs)
     return _RelativeDateRule(delta=delta, relative_to=variable)
+
+
+def _parse_week_rule(s):
+    s = s.lower()
+    match = re.match(r'([\w]+) of week (\d+)$', s)
+
+    if not match:
+        raise ValidationError(f"Invalid week reference: {s}")
+
+    day_of_the_week_string, week_string = match.groups()
+
+    try:
+        day_of_the_week = getattr(DaysOfTheWeek, day_of_the_week_string.upper())
+    except AttributeError:
+        raise ValidationError(f"Invalid weekday: {day_of_the_week}")
+
+    return _WeekRule(day_of_the_week=day_of_the_week, week_number=int(week_string))
 
 
 def _topologically_sort_date_rules(rules):
@@ -738,7 +776,43 @@ def _topologically_sort_date_rules(rules):
     return list(x for x in reverse_sorted if x in rules)
 
 
-def _resolve_smart_dates(smart_dates, universe):
+
+def _recurring_days_of_the_week(weekdays, starting_on):
+    """Generator that yields recurring weekdays.
+
+    Parameters
+    ----------
+    weekdays : Collection[Union[int, DaysOfTheWeek]]
+        A collection of days of the week (or integers, where Monday == 0).
+    starting_on : datetime.date
+        The starting date.
+
+    Yields
+    ------
+    datetime.date
+        The date of the next weekday in ``weekdays``.
+
+    """
+    current_date = starting_on
+    while True:
+        if current_date.weekday() in weekdays:
+            yield current_date
+        current_date += datetime.timedelta(days=1)
+
+
+def _resolve_week_rule(rule, start_date):
+    if start_date is None:
+        raise RuntimeError('The start date is not set, but a smart date refers to it.')
+
+    # get the start of the week reference by the rule
+    week_start_date = start_date + datetime.timedelta(weeks=rule.week_number - 1)
+
+    # get the next rule.day_of_the_week
+    return next(_recurring_days_of_the_week({rule.day_of_the_week}, week_start_date))
+
+
+
+def _resolve_smart_dates(smart_dates, universe, start_date=None):
     """Parses the natural language "smart dates" in a dictionary.
 
     Parameters
@@ -769,11 +843,17 @@ def _resolve_smart_dates(smart_dates, universe):
         except ValidationError:
             pass
 
+        try:
+            return _parse_week_rule(s)
+        except ValidationError:
+            pass
+
         raise ValidationError(f"Cannot parse smart date: {s}")
 
     rules = {k: _parse(v) for k, v in smart_dates.items()}
     order = _topologically_sort_date_rules(rules)
 
+    # update the universe by resolving the smart dates
     for key in order:
         rule = rules[key]
 
@@ -784,6 +864,8 @@ def _resolve_smart_dates(smart_dates, universe):
                 raise ValidationError(
                     f"Relative rule wants unknown field: {rule.relative_to}"
                 )
+        elif isinstance(rule, _WeekRule):
+            universe[key] = _resolve_week_rule(rule, start_date)
         else:
             # the rule is just a datetime or date object
             universe[key] = rule
@@ -791,7 +873,7 @@ def _resolve_smart_dates(smart_dates, universe):
     return {k: universe[k] for k in smart_dates}
 
 
-def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path):
+def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path, start_date):
     def _is_smart_date(k):
         try:
             return metadata_schema[k]["type"] in {"smartdate", "smartdatetime"}
@@ -802,7 +884,7 @@ def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path):
     universe = {k: v for k, v in metadata.items() if not _is_smart_date(k)}
 
     try:
-        resolved = _resolve_smart_dates(smart_dates, universe)
+        resolved = _resolve_smart_dates(smart_dates, universe, start_date)
     except ValidationError as exc:
         raise DiscoveryError(str(exc), path)
 
@@ -813,7 +895,7 @@ def _resolve_smart_dates_in_metadata(metadata, metadata_schema, path):
     return result
 
 
-def _resolve_smart_dates_in_release_time(release_time, metadata, path):
+def _resolve_smart_dates_in_release_time(release_time, metadata, path, start_date):
     # the release time can be None, or a datetime object
     if not isinstance(release_time, str):
         return release_time
@@ -824,7 +906,7 @@ def _resolve_smart_dates_in_release_time(release_time, metadata, path):
     universe = {"metadata." + k: v for k, v in metadata.items()}
 
     try:
-        resolved = _resolve_smart_dates(smart_dates, universe)["release_time"]
+        resolved = _resolve_smart_dates(smart_dates, universe, start_date)["release_time"]
     except ValidationError as exc:
         raise DiscoveryError(str(exc), path)
 
@@ -834,7 +916,7 @@ def _resolve_smart_dates_in_release_time(release_time, metadata, path):
     return resolved
 
 
-def read_publication_file(path, schema=None):
+def read_publication_file(path, schema=None, start_date=None):
     """Read a :class:`Publication` from a yaml file.
 
     Parameters
@@ -844,6 +926,9 @@ def read_publication_file(path, schema=None):
     schema : Optional[Schema]
         A schema for validating the publication. Default: None, in which case the
         publication's metadata are not validated.
+    start_date : Optional[datetime.date]
+        What should be considered the start of "week 1". If None, smart dates referring
+        to weeks cannot be used.
 
     Returns
     -------
@@ -917,7 +1002,7 @@ def read_publication_file(path, schema=None):
 
     if hasattr(schema, "metadata_schema"):
         metadata = _resolve_smart_dates_in_metadata(
-            metadata, schema.metadata_schema, path
+            metadata, schema.metadata_schema, path, start_date=start_date
         )
 
     # convert each artifact to an Artifact object
@@ -925,7 +1010,7 @@ def read_publication_file(path, schema=None):
     for key, definition in validated["artifacts"].items():
         # handle relative release times
         definition["release_time"] = _resolve_smart_dates_in_release_time(
-            definition["release_time"], metadata, path
+            definition["release_time"], metadata, path, start_date=start_date
         )
 
         # if no file is provided, use the key
@@ -936,7 +1021,7 @@ def read_publication_file(path, schema=None):
 
     # handle publication release time
     release_time = _resolve_smart_dates_in_release_time(
-        validated["release_time"], metadata, path
+        validated["release_time"], metadata, path, start_date=start_date
     )
 
     publication = Publication(

@@ -885,6 +885,87 @@ def test_read_publication_with_relative_dates_in_metadata(write_file):
     assert publication.metadata["released"] == expected
 
 
+def test_read_publication_with_relative_dates_in_metadata_checks_type(write_file):
+    # given
+    # released should be a datetime, but it's going to be a date since its relative
+    # to due, which is a date
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-10
+                released: 7 days before due
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 2020-01-02 23:59:00
+            """
+        ),
+    )
+
+    schema = publish.Schema(
+        required_artifacts=["homework", "solution"],
+        metadata_schema={
+            "name": {"type": "string"},
+            "due": {"type": "date"},
+            "released": {"type": "smartdatetime"},
+        },
+    )
+
+    # when
+    with raises(publish.DiscoveryError):
+        publish.read_publication_file(path, schema=schema)
+
+
+def test_read_publication_with_relative_dates_in_metadata_without_offset(write_file):
+    # given
+    # released should be a datetime, but it's going to be a date since its relative
+    # to due, which is a date
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: 2020-09-10
+                released: due
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 2020-01-02 23:59:00
+            """
+        ),
+    )
+
+    schema = publish.Schema(
+        required_artifacts=["homework", "solution"],
+        metadata_schema={
+            "name": {"type": "string"},
+            "due": {"type": "date"},
+            "released": {"type": "smartdate"},
+        },
+    )
+
+    # when
+    publication = publish.read_publication_file(path, schema=schema)
+
+    # then
+    expected = datetime.date(2020, 9, 10)
+    assert publication.metadata["released"] == expected
+
+
 @mark.private
 def test_resolve_smart_dates_on_simple_example():
     # given
@@ -917,3 +998,91 @@ def test_resolve_smart_dates_raises_on_cycle():
     # when
     with raises(publish.ValidationError):
         publish._resolve_smart_dates(smart_dates, universe={})
+
+
+@mark.private
+def test_resolve_smart_dates_raises_on_cycle():
+    # given
+    smart_dates = {
+        "due": "1 day before released",
+        "released": "7 days before due",
+        "graded": "5 days after due",
+    }
+
+    # when
+    with raises(publish.ValidationError):
+        publish._resolve_smart_dates(smart_dates, universe={})
+
+
+@mark.private
+def test_resolve_smart_dates_with_week_reference():
+    # given
+    smart_dates = {
+        "due": "tuesday of week 02",
+        "released": "7 days before due",
+        "graded": "5 days after due",
+    }
+
+    # when
+    resolved = publish._resolve_smart_dates(smart_dates, universe={}, start_date=datetime.date(2021, 1, 15))
+
+    # then
+    resolved['due'] == datetime.date(2021, 1, 19)
+    resolved['released'] == datetime.date(2021, 1, 12)
+    resolved['graded'] == datetime.date(2021, 1, 24)
+
+
+@mark.private
+def test_resolve_smart_dates_with_week_reference_raises_if_start_week_not_set():
+    # given
+    smart_dates = {
+        "due": "tuesday of week 02",
+        "released": "7 days before due",
+        "graded": "5 days after due",
+    }
+
+    # when
+    with raises(RuntimeError):
+        resolved = publish._resolve_smart_dates(smart_dates, universe={}, )
+
+
+def test_read_publication_with_date_relative_to_week(write_file):
+    # given
+    # released should be a datetime, but it's going to be a date since its relative
+    # to due, which is a date
+    path = write_file(
+        "publish.yaml",
+        contents=dedent(
+            """
+            metadata:
+                name: Homework 01
+                due: wednesday of week 01
+                released: 7 days before due
+
+            artifacts:
+                homework:
+                    file: ./homework.pdf
+                    recipe: make homework
+                solution:
+                    file: ./solution.pdf
+                    recipe: make solution
+                    release_time: 2020-01-02 23:59:00
+            """
+        ),
+    )
+
+    schema = publish.Schema(
+        required_artifacts=["homework", "solution"],
+        metadata_schema={
+            "name": {"type": "string"},
+            "due": {"type": "smartdate"},
+            "released": {"type": "smartdate"},
+        },
+    )
+
+    # when
+    publication = publish.read_publication_file(path, schema=schema, start_date=datetime.date(2021, 1, 11))
+
+    # then
+    assert publication.metadata["due"] == datetime.date(2021, 1, 13)
+    assert publication.metadata["released"] == datetime.date(2021, 1, 6)
