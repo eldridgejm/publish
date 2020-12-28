@@ -2,7 +2,7 @@ import datetime
 import pathlib
 from textwrap import dedent
 
-from pytest import raises, fixture
+from pytest import raises, fixture, mark
 
 import publish
 
@@ -843,6 +843,7 @@ def test_read_artifact_with_absolute_release_time(write_file):
 # relative metadata
 # --------------------------------------------------------------------------------------
 
+
 def test_read_artifact_with_relative_dates_in_metadata(write_file):
     # given
     path = write_file(
@@ -866,9 +867,52 @@ def test_read_artifact_with_relative_dates_in_metadata(write_file):
         ),
     )
 
+    schema = publish.Schema(
+        required_artifacts=["homework", "solution"],
+        metadata_schema={
+            "name": {"type": "string"},
+            "due": {"type": "datetime"},
+            "released": {"type": "smartdatetime"},
+        },
+    )
+
     # when
-    publication = publish.read_publication_file(path)
+    publication = publish.read_publication_file(path, schema=schema)
 
     # then
     expected = datetime.datetime(2020, 9, 3, 23, 59, 0)
-    # assert publication.metadata["released"] == expected
+    assert publication.metadata["released"] == expected
+
+
+@mark.private
+def test_resolve_smart_dates_on_simple_example():
+    # given
+    smart_dates = {
+        "due": datetime.date(2020, 12, 15),
+        "released": "7 days before due",
+        "graded": "5 days after due",
+    }
+
+    # when
+    resolved = publish._resolve_smart_dates(smart_dates, universe={})
+
+    # then
+    assert resolved == {
+        "due": datetime.date(2020, 12, 15),
+        "released": datetime.date(2020, 12, 8),
+        "graded": datetime.date(2020, 12, 20),
+    }
+
+
+@mark.private
+def test_resolve_smart_dates_raises_on_cycle():
+    # given
+    smart_dates = {
+        "due": "1 day before released",
+        "released": "7 days before due",
+        "graded": "5 days after due",
+    }
+
+    # when
+    with raises(publish.ValidationError):
+        publish._resolve_smart_dates(smart_dates, universe={})

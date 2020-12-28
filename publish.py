@@ -507,6 +507,18 @@ class Schema(typing.NamedTuple):
 # --------------------------------------------------------------------------------------
 
 
+class _PublicationValidator(cerberus.Validator):
+    types_mapping = cerberus.Validator.types_mapping.copy()
+
+    types_mapping["smartdate"] = cerberus.TypeDefinition(
+        "smartdate", (str, datetime.date), ()
+    )
+
+    types_mapping["smartdatetime"] = cerberus.TypeDefinition(
+        "smartdate", (str, datetime.datetime), ()
+    )
+
+
 def validate(publication: Publication, against: Schema):
     """Make sure that a publication satisfies the schema.
 
@@ -536,7 +548,10 @@ def validate(publication: Publication, against: Schema):
 
     # if there is a metadata schema, enforce it
     if schema.metadata_schema is not None:
-        validator = cerberus.Validator(schema.metadata_schema, require_all=True)
+        validator = _PublicationValidator(schema.metadata_schema, require_all=True)
+
+        # define the smartdate and smartdatetime data types
+        validator
         validated = validator.validated(publication.metadata)
         if validated is None:
             raise ValidationError(f"Invalid metadata. {validator.errors}")
@@ -700,6 +715,150 @@ def _parse_release_time(s, metadata):
     return metadata[variable] + delta
 
 
+class _RelativeDateRule(typing.NamedTuple):
+    delta: datetime.timedelta
+    relative_to: str
+
+
+def _parse_relative_date_rule(s):
+    """Reads a relative date rule from natural language.
+
+    This supports several forms, such as:
+
+        - 3 days before other_field
+        - 1 day before other_field
+        - 5 days after other_field
+
+    Case doesn't matter. 
+
+    Parameters
+    ----------
+    s : str
+        The string to read.
+
+    Raises
+    ------
+    ValidationError
+        If the string cannot be read as a relative date.
+
+    Returns
+    -------
+    RelativeDateRule
+        The rule read from the text.
+
+    """
+    long_match = re.match(r"^(\d+) (hour|day)[s]{0,1} (after|before) (\w+)$", s)
+
+    if long_match:
+        number, hours_or_days, before_or_after, variable = long_match.groups()
+        factor = -1 if before_or_after == "before" else 1
+    else:
+        raise ValidationError("Invalid relative date string.")
+
+    if hours_or_days == "hour":
+        timedelta_kwargs = {"hours": factor * int(number)}
+    else:
+        timedelta_kwargs = {"days": factor * int(number)}
+
+    delta = datetime.timedelta(**timedelta_kwargs)
+    return _RelativeDateRule(delta=delta, relative_to=variable)
+
+
+def _topologically_sort_date_rules(rules):
+    """Topologically sort rules based on their dependencies."""
+
+    start = {}
+    finish = {}
+
+    def _dfs(source, clock):
+        clock += 1
+        start[source] = clock
+        if isinstance(rules.get(source, None), _RelativeDateRule):
+            child = rules[source].relative_to
+            if (child in start) and (child not in finish):
+                raise ValidationError("The smart date references are cyclical.")
+            _dfs(child, clock)
+        clock += 1
+        finish[source] = clock
+        return clock
+
+    clock = 0
+    for rule in rules:
+        if rule not in finish:
+            clock = _dfs(rule, clock)
+
+    reverse_sorted = sorted(finish.keys(), key=lambda x: finish[x], reverse=True)
+    return list(x for x in reverse_sorted if x in rules)
+
+
+def _resolve_smart_dates(smart_dates, universe):
+    """Parses the natural language "smart dates" in a dictionary.
+
+    Parameters
+    ----------
+    smart_dates : dict
+        A dictionary whose values are smart date strings or datetime/date
+        objects. The smart dates may depend on one another, or on values in the
+        universe.
+    universe : dict
+        A dictionary whose values are dates that the smart dates may refer to.
+
+    Returns
+    -------
+    resolved
+        A dictionary with the same keys as ``smart_dates``, but where the values are
+        datetime or date objects.
+
+    """
+    universe = universe.copy()
+
+    # a helper function to parse a smart string, or maybe a date
+    def _parse(s):
+        if isinstance(s, (datetime.date, datetime.datetime)):
+            return s
+
+        try:
+            return _parse_relative_date_rule(s)
+        except ValidationError:
+            pass
+
+        raise ValidationError(f"Cannot parse smart date: {s}")
+
+    rules = {k: _parse(v) for k, v in smart_dates.items()}
+    order = _topologically_sort_date_rules(rules)
+
+    for key in order:
+        rule = rules[key]
+
+        if isinstance(rule, _RelativeDateRule):
+            universe[key] = universe[rule.relative_to] + rule.delta
+        else:
+            # the rule is just a datetime or date object
+            universe[key] = rule
+
+    return {k: universe[k] for k in smart_dates}
+
+
+def _resolve_smart_dates_in_metadata(metadata, metadata_schema):
+
+    def _is_smart_date(k):
+        try:
+            return metadata_schema[k]['type'] in {'smartdate', 'smartdatetime'}
+        except Exception:
+            return False
+
+    smart_dates = {k: v for k, v in metadata.items() if _is_smart_date(k)}
+    universe = {k: v for k, v in metadata.items() if not _is_smart_date(k)}
+
+    resolved = _resolve_smart_dates(smart_dates, universe)
+
+    result = metadata.copy()
+    for key, value in resolved.items():
+        result[key] = value
+
+    return result
+
+
 def read_publication_file(path, schema=None):
     """Read a :class:`Publication` from a yaml file.
 
@@ -763,7 +922,7 @@ def read_publication_file(path, schema=None):
                     "ready": {"type": "boolean", "default": True, "nullable": True},
                     "missing_ok": {"type": "boolean", "default": False},
                     "release_time": {
-                        "type": ["datetime", "string"],
+                        "type": "smartdatetime",
                         "default": None,
                         "nullable": True,
                     },
@@ -773,13 +932,16 @@ def read_publication_file(path, schema=None):
     }
 
     # validate and normalize the contents
-    validator = cerberus.Validator(quick_schema, require_all=True)
+    validator = _PublicationValidator(quick_schema, require_all=True)
     validated = validator.validated(contents)
 
     if validated is None:
         raise DiscoveryError(str(validator.errors), path)
 
     metadata = validated["metadata"]
+
+    if hasattr(schema, 'metadata_schema'):
+        metadata = _resolve_smart_dates_in_metadata(metadata, schema.metadata_schema)
 
     # convert each artifact to an Artifact object
     artifacts = {}
@@ -986,7 +1148,9 @@ def discover(
         publication_file = path / PUBLICATION_FILE
 
         try:
-            publication = read_publication_file(publication_file, schema=parent_collection.schema)
+            publication = read_publication_file(
+                publication_file, schema=parent_collection.schema
+            )
         except ValidationError as exc:
             raise DiscoveryError(str(exc), publication_file)
 
