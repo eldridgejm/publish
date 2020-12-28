@@ -331,75 +331,45 @@ class DiscoverCallbacks:
         """
 
 
-# represents a node in the BFS used in discover()
-_BFSNode = namedtuple("Node", "path parent_collection parent_collection_path")
+def _is_collection(path):
+    """Determine if the path is a collection."""
+    return (path / constants.COLLECTION_FILE).is_file()
 
 
-def _discover_bfs(
-    initial_node, make_collection, make_publication, skip_directories, callbacks
+def _is_publication(path):
+    """Determine if the path is a publication."""
+    return (path / constants.PUBLICATION_FILE).is_file()
+
+
+def _search_for_collections_and_publications(
+    input_directory: pathlib.Path, skip_directories=None, callbacks=None
 ):
-    """Execute a BFS to find collections/publications in the filesystem."""
-
-    queue = deque([initial_node])
-    while queue:
-        # the current directory, parent collection, and it's path
-        (path, parent_collection, parent_collection_path) = node = queue.popleft()
-
-        is_collection = (node.path / constants.COLLECTION_FILE).is_file()
-        is_publication = (node.path / constants.PUBLICATION_FILE).is_file()
-
-        if is_collection and is_publication:
-            raise DiscoveryError("Cannot be both a publication and a collection.", path)
-
-        if is_collection:
-            collection = make_collection(node)
-
-            # now that we're in a new collection, the parent has changed
-            parent_collection = collection
-            parent_collection_path = path
-
-        if is_publication:
-            make_publication(node)
-
-        for subpath in path.iterdir():
-
-            if subpath.name in skip_directories:
-                callbacks.on_skip(subpath)
-                continue
-
-            if subpath.is_dir():
-                node = _BFSNode(
-                    path=subpath,
-                    parent_collection=parent_collection,
-                    parent_collection_path=parent_collection_path,
-                )
-                queue.append(node)
-
-
-def _discover_old(
-    input_directory: pathlib.Path,
-    skip_directories: typing.Optional[typing.Collection[str]] = None,
-    callbacks: typing.Optional[DiscoverCallbacks] = None,
-) -> Universe:
-    """Discover the collections and publications in the filesystem.
+    """Perform a BFS to find all collections and publications in the filesystem.
 
     Parameters
     ----------
-    input_directory
-        The path to the directory that will be recursively searched.
-    skip_directories
-        A collection of directory names that should be skipped if discovered.
-        If None, no directories will be skipped.
-    callbacks : Optional[DiscoverCallbacks]
-        Callbacks to be invoked during the discovery. If omitted, no callbacks
-        are executed. See :class:`DiscoverCallbacks` for the possible callbacks
-        and their arguments.
+    input_directory : pathlib.Path
+        Path to the input directory that will be recursively searched.
+    skip_directories : Optional[Collection[str]]
+        A collection of folder names that, if found, will be skipped over. If None,
+        every folder is searched.
+    callbacks : DiscoverCallbacks
+        Callbacks invoked when interesting things happen.
 
     Returns
     -------
-    Universe
-        The collections and the nested publications and artifacts, contained in
-        a :class:`Universe` instance.
+    List[Path]
+        The path to every collection discovered. The "default" collection is not included.
+    Mapping[Path, Union[Path, None]]
+        A mapping whose keys are the paths to all discovered publications. The values
+        are paths to the collections containing the publications. If a publication has
+        no collection (or rather, belongs to the "default" collection), its value will
+        be ``None``.
+
+    Raises
+    ------
+    DiscoveryError
+        If a nested collection is found.
 
     """
     if skip_directories is None:
@@ -407,92 +377,6 @@ def _discover_old(
 
     if callbacks is None:
         callbacks = DiscoverCallbacks()
-
-    # the collection publications are added to if they belong to no other collection
-    default_schema = Schema(
-        required_artifacts=[], metadata_schema=None, allow_unspecified_artifacts=True,
-    )
-    default_collection = Collection(schema=default_schema, publications={})
-
-    # by default, we have just the default collection; we'll discover more
-    collections = {"default": default_collection}
-
-    # we will run a BFS to discover the collection -> publication -> archive
-    # hierarchy. each BFS node will be a triple of the current directory, the
-    # parent collection, and the path to the parent collection's directory
-    initial_node = _BFSNode(
-        path=input_directory,
-        parent_collection=default_collection,
-        parent_collection_path=input_directory,
-    )
-
-    # to simplify the code, our BFS function will outsource the creation and validation
-    # of our new collection/publication to the below callbacks functions
-
-    def make_collection(node: _BFSNode):
-        """Called when a new collection is discovered. Creates/returns collection."""
-        path, parent_collection, parent_collection_path = node
-
-        # ensure no nested collections
-        if parent_collection is not default_collection:
-            raise DiscoveryError("Nested collection found.", path)
-
-        # create the collection
-        collection_file = path / constants.COLLECTION_FILE
-        new_collection = read_collection_file(collection_file)
-
-        # add it to the rest of the collections
-        key = str(path.relative_to(input_directory))
-        collections[key] = new_collection
-
-        # callback
-        callbacks.on_collection(collection_file)
-
-        # return the new collection
-        return collections[key]
-
-    def make_publication(node: _BFSNode):
-        """Called when a new publication is discovered."""
-        path, parent_collection, parent_collection_path = node
-
-        # read the publication file
-        publication_file = path / constants.PUBLICATION_FILE
-
-        try:
-            publication = read_publication_file(
-                publication_file, schema=parent_collection.schema
-            )
-        except ValidationError as exc:
-            raise DiscoveryError(str(exc), publication_file)
-
-        # add the publication to the parent collection
-        key = str(path.relative_to(parent_collection_path))
-        parent_collection.publications[key] = publication
-
-        # callbacks
-        callbacks.on_publication(publication_file)
-
-    # run the BFS; this will populate the `collections` dictionary
-    _discover_bfs(
-        initial_node, make_collection, make_publication, skip_directories, callbacks
-    )
-
-    return Universe(collections)
-
-
-def _is_collection(path):
-    return (path / constants.COLLECTION_FILE).is_file()
-
-
-def _is_publication(path):
-    return (path / constants.PUBLICATION_FILE).is_file()
-
-
-def _search_for_collections_and_publications(
-    input_directory: pathlib.Path, skip_directories=None
-):
-    if skip_directories is None:
-        skip_directories = set()
 
     queue = deque([(input_directory, None)])
 
@@ -503,6 +387,9 @@ def _search_for_collections_and_publications(
         current_path, parent_collection_path = queue.pop()
 
         if _is_collection(current_path):
+            if parent_collection_path is not None:
+                raise DiscoveryError(f"Nested collection found.", current_path)
+
             collections.append(current_path)
             parent_collection_path = current_path
 
@@ -512,6 +399,7 @@ def _search_for_collections_and_publications(
         for subpath in current_path.iterdir():
             if subpath.is_dir():
                 if subpath.name in skip_directories:
+                    callbacks.on_skip(subpath)
                     continue
                 queue.append((subpath, parent_collection_path))
 
@@ -519,66 +407,112 @@ def _search_for_collections_and_publications(
 
 
 def _make_default_collection():
+    """Create a default collection."""
     default_schema = Schema(
         required_artifacts=[], metadata_schema=None, allow_unspecified_artifacts=True,
     )
     return Collection(schema=default_schema, publications={})
 
 
-def _make_collection(path):
-    """Called when a new collection is discovered. Creates/returns collection."""
+def _make_collections(collection_paths, input_directory, callbacks):
+    """Make the Collection objects. 
 
-    # create the collection
-    collection_file = path / constants.COLLECTION_FILE
-    new_collection = read_collection_file(collection_file)
+    Parameters
+    ----------
+    collection_paths : List[Path]
+        A list containing the path to every discovered collection.
+    input_directory : Path
+        Path to the root of the search.
+    callbacks : DiscoverCallbacks
+        The callbacks to be invoked when interesting things happen.
 
-    return new_collection
+    Returns
+    -------
+    Mapping[str, Collection]
+        A mapping from collection keys to new Collection objects. A collection's key is
+        the string form of its path relative to the input directory.
+
+    """
+    collections = {}
+    for path in collection_paths:
+        file_path = path / constants.COLLECTION_FILE
+
+        collection = read_collection_file(file_path)
+
+        key = str(path.relative_to(input_directory))
+        collections[key] = collection
+
+        callbacks.on_collection(file_path)
+
+    collections["default"] = _make_default_collection()
+    return collections
 
 
-def _make_publication(path, parent_collection, parent_collection_path):
-    """Called when a new publication is discovered."""
+def _make_publications(publication_paths, input_directory, collections, callbacks):
+    """Make the Publication objects.
 
-    # read the publication file
-    publication_file = path / constants.PUBLICATION_FILE
+    Parameters
+    ----------
+    publication_paths : Mapping[Path, Union[Path, None]]
+        Mapping from publication paths to the paths of the collections containing them
+        (or ``None`` if the publication is part of the "default" collection.
+    input_directory : Path
+        Path to the root of the search.
+    collections : Mapping[str, Collection]
+        A mapping from collection keys to Collection objects. The newly-created 
+        Publication objects will be added to these Collection objects in-place.
+    callbacks : DiscoverCallbacks
+        The callbacks to be invoked when interesting things happen.
 
-    try:
-        publication = read_publication_file(
-            publication_file, schema=parent_collection.schema
-        )
-    except ValidationError as exc:
-        raise DiscoveryError(str(exc), publication_file)
+    """
+    for path, collection_path in publication_paths.items():
+        if collection_path is None:
+            collection_key = "default"
+            publication_key = str(path.relative_to(input_directory))
+        else:
+            collection_key = str(collection_path.relative_to(input_directory))
+            publication_key = str(path.relative_to(collection_path))
 
-    key = str(path.relative_to(parent_collection_path))
-    parent_collection.publications[key] = publication
+        collection = collections[collection_key]
+
+        file_path = path / constants.PUBLICATION_FILE
+        publication = read_publication_file(file_path, schema=collection.schema)
+
+        collection.publications[publication_key] = publication
+
+        callbacks.on_publication(file_path)
 
 
+def discover(input_directory, skip_directories=None, callbacks=None):
+    """Discover the collections and publications in the filesystem.
 
-def discover(
-    input_directory: pathlib.Path,
-    skip_directories: typing.Optional[typing.Collection[str]] = None,
-    callbacks: typing.Optional[DiscoverCallbacks] = None,
-):
+    Parameters
+    ----------
+    input_directory : Path
+        The path to the directory that will be recursively searched.
 
-    default_collection = _make_default_collection()
+    skip_directories : Optional[Collection[str]]
+        A collection of directory names that should be skipped if discovered.
+        If None, no directories will be skipped.
+
+    callbacks : Optional[DiscoverCallbacks]
+        Callbacks to be invoked during the discovery. If omitted, no callbacks
+        are executed. See :class:`DiscoverCallbacks` for the possible callbacks
+        and their arguments.
+    Returns
+    -------
+    Universe
+        The collections and the nested publications and artifacts, contained in
+        a :class:`Universe` instance.
+    """
+    if callbacks is None:
+        callbacks = DiscoverCallbacks()
 
     collection_paths, publication_paths = _search_for_collections_and_publications(
-        input_directory, skip_directories=skip_directories
+        input_directory, skip_directories=skip_directories, callbacks=callbacks
     )
 
-    collections = {p: _make_collection(p) for p in collection_paths}
-
-    for publication_path, parent_collection_path in publication_paths.items():
-        if parent_collection_path is None:
-            parent_collection = default_collection
-            parent_collection_path = input_directory
-        else:
-            parent_collection = collections[parent_collection_path]
-
-        _make_publication(publication_path, parent_collection, parent_collection_path)
-
-    collections = {
-        str(k.relative_to(input_directory)): v for k, v in collections.items()
-    }
-    collections["default"] = default_collection
+    collections = _make_collections(collection_paths, input_directory, callbacks)
+    _make_publications(publication_paths, input_directory, collections, callbacks)
 
     return Universe(collections)

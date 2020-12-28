@@ -128,7 +128,7 @@ def test_discover_validates_publication_metadata_schema():
         publish.discover(EXAMPLE_6_DIRECTORY)
 
 
-def test_dicover_raises_when_nested_collections_discovered():
+def test_discover_raises_when_nested_collections_discovered():
     with raises(publish.DiscoveryError):
         publish.discover(EXAMPLE_4_DIRECTORY)
 
