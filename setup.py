@@ -7,5 +7,5 @@ setup(
     packages=find_packages("publish"),
     install_requires=["pyyaml", "cerberus"],
     tests_require=["pytest"],
-    entry_points={"console_scripts": ["publish = publish:cli"]},
+    entry_points={"console_scripts": ["publish = publish:cli", "publish-utils = publish.utils:cli"]},
 )

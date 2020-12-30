@@ -8,6 +8,6 @@ schema:
         name:
             type: string
         date: 
-            type: smartdate
+            type: smartdatetime
 
     is_ordered: true

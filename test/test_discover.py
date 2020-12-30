@@ -1123,9 +1123,10 @@ def test_discover_with_dates_relating_to_previous():
     # then
     publications = universe.collections["lectures"].publications
 
-    assert publications["01-intro"].metadata['date'] == datetime.date(2021, 1, 5)
-    assert publications["02-foo"].metadata['date'] == datetime.date(2021, 1, 7)
-    assert publications["03-bar"].metadata['date'] == datetime.date(2021, 1, 12)
+    assert publications["01-intro"].metadata['date'] == datetime.datetime(2021, 1, 5, 23, 0)
+    assert publications["02-foo"].metadata['date'] == datetime.datetime(2021, 1, 7, 23, 0)
+    assert publications["03-bar"].metadata['date'] == datetime.datetime(2021, 1, 12, 23, 0)
     # suppose lecture 4 had to be moved; it is manually set in the file
-    assert publications["04-baz"].metadata['date'] == datetime.date(2021, 1, 19)
-    assert publications["05-conclusion"].metadata['date'] == datetime.date(2021, 1, 21)
+    assert publications["04-baz"].metadata['date'] == datetime.datetime(2021, 1, 19, 23, 0)
+    assert publications["05-conclusion"].metadata['date'] == datetime.datetime(2021, 1, 21, 23, 0)
+
