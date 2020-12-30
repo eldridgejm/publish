@@ -2,4 +2,4 @@
 COLLECTION_FILE = "collection.yaml"
 
 # the file used to define a publication and its artifacts
-PUBLICATION_FILE = "publish.yaml"
+PUBLICATION_FILE = "publication.yaml"

@@ -405,7 +405,7 @@ def test_read_collection_raises_on_invalid_metadata_schema(write_file):
 def test_read_publication_example(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -437,7 +437,7 @@ def test_read_publication_example(write_file):
 def test_read_publication_without_release_time(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -467,7 +467,7 @@ def test_read_publication_without_release_time(write_file):
 def test_read_publication_with_relative_release_time(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -500,7 +500,7 @@ def test_read_publication_with_relative_release_time(write_file):
 def test_read_artifact_with_relative_release_time(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -532,7 +532,7 @@ def test_read_artifact_with_relative_release_date_but_no_time_raises(write_file)
     # given
     # release_time must be a datetime, but it's a date here
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -560,7 +560,7 @@ def test_read_artifact_with_relative_release_date_but_no_time_raises(write_file)
 def test_read_artifact_with_relative_release_time_after(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -591,7 +591,7 @@ def test_read_artifact_with_relative_release_time_after(write_file):
 def test_read_artifact_with_relative_release_time_after_hours(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -622,7 +622,7 @@ def test_read_artifact_with_relative_release_time_after_hours(write_file):
 def test_read_artifact_with_relative_release_time_after_large(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -653,7 +653,7 @@ def test_read_artifact_with_relative_release_time_after_large(write_file):
 def test_read_artifact_with_relative_release_time_after_large_hours(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -684,7 +684,7 @@ def test_read_artifact_with_relative_release_time_after_large_hours(write_file):
 def test_read_artifact_with_relative_release_date_before(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -715,7 +715,7 @@ def test_read_artifact_with_relative_release_date_before(write_file):
 def test_read_artifact_with_relative_release_date_before_hours(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -746,7 +746,7 @@ def test_read_artifact_with_relative_release_date_before_hours(write_file):
 def test_read_artifact_with_relative_release_time_multiple_days(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -777,7 +777,7 @@ def test_read_artifact_with_relative_release_time_multiple_days(write_file):
 def test_read_artifact_with_invalid_relative_date_raises(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -807,7 +807,7 @@ def test_read_artifact_with_invalid_relative_date_variable_reference_raises(
 ):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -835,7 +835,7 @@ def test_read_artifact_with_invalid_relative_date_variable_reference_raises(
 def test_read_artifact_with_absolute_release_time(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -870,7 +870,7 @@ def test_read_artifact_with_absolute_release_time(write_file):
 def test_read_publication_with_relative_dates_in_metadata(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -912,7 +912,7 @@ def test_read_publication_with_relative_dates_in_metadata_checks_type(write_file
     # released should be a datetime, but it's going to be a date since its relative
     # to due, which is a date
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -951,7 +951,7 @@ def test_read_publication_with_relative_dates_in_metadata_without_offset(write_f
     # released should be a datetime, but it's going to be a date since its relative
     # to due, which is a date
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -991,7 +991,7 @@ def test_read_publication_with_relative_dates_in_metadata_without_offset(write_f
 def test_read_publication_with_date_relative_to_week(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -1035,7 +1035,7 @@ def test_read_publication_with_date_relative_to_week(write_file):
 def test_read_publication_with_datetime_relative_to_week(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
@@ -1079,7 +1079,7 @@ def test_read_publication_with_datetime_relative_to_week(write_file):
 def test_read_publication_with_unknown_relative_field_raises(write_file):
     # given
     path = write_file(
-        "publish.yaml",
+        "publication.yaml",
         contents=dedent(
             """
             metadata:
