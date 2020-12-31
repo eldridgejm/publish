@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="publish",
-    version="0.1.5",
+    version="0.2.0",
     packages=find_packages(),
     install_requires=["pyyaml", "cerberus", "jinja2"],
     tests_require=["pytest"],

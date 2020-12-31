@@ -3,6 +3,9 @@ import argparse
 import collections
 import datetime
 import pathlib
+import typing
+
+import yaml
 
 from . import serialize, discover, DateContext
 
@@ -34,18 +37,39 @@ def _all_artifacts(universe):
                 )
 
 
-def _effective_release_time(loc):
+class _Never:
+    def __lt__(self, other):
+        if not isinstance(other, (datetime.date, _Never)):
+            return NotImplemented
+        return False
+
+    def __gt__(self, other):
+        if not isinstance(other, (datetime.date, _Never)):
+            return NotImplemented
+        return True
+
+
+class ReleaseInfo(typing.NamedTuple):
+    # the sooner of the publication release time and the artifact release time;
+    # if both are None, so is this
+    effective_release_time: datetime.datetime
+
+    # the smaller of the publication ready and artifact ready
+    ready: bool
+
+
+def _release_info(loc):
+
     if loc.artifact.release_time is None:
-        sooner = loc.publication.release_time
+        ert = loc.publication.release_time
     elif loc.publication.release_time is None:
-        sooner = loc.artifact.release_time
+        ert = loc.artifact.release_time
     else:
-        sooner = min(loc.artifact.release_time, loc.publication.release_time)
+        ert = min(loc.publication.release_time, loc.artifact.release_time)
 
-    if sooner is None:
-        sooner = datetime.datetime.now()
+    ready = min(loc.artifact.ready, loc.publication.ready)
 
-    return sooner
+    return ReleaseInfo(ert, ready)
 
 
 def _header(message):
@@ -76,62 +100,148 @@ def cli(argv=None):
     pass
 
 
-def release_calendar(cwd, date_context, show_published=False, skip_directories=None):
+def _rpad(s, total_len):
+    difference = total_len - len(s)
+    return s + (" " * difference)
+
+
+def _lpad(s, total_len):
+    difference = total_len - len(s)
+    return (" " * difference) + s
+
+
+def _days_between(date_x, date_y):
+    return (date_x - date_y).days
+
+
+def release_schedule(args):
     universe = discover(
-        cwd, date_context=date_context, skip_directories=skip_directories
+        args.path, skip_directories=args.skip_directories, template_vars=args.vars
     )
 
-    times = [(loc, _effective_release_time(loc)) for loc in _all_artifacts(universe)]
-    sorted_times = sorted(times, key=lambda x: x[1])
+    # get the release info for every artifact
+    info = [(loc, _release_info(loc)) for loc in _all_artifacts(universe)]
 
-    now = datetime.datetime.now()
+    without_release_time = [x for x in info if x[1].effective_release_time is None]
+    with_release_time = [x for x in info if x[1].effective_release_time is not None]
 
-    for loc, time in sorted_times:
-        if time > now or show_published:
+    if not args.show_not_ready:
+        with_release_time = [x for x in with_release_time if x[1].ready]
 
-            if time > now:
+    # sort in order of release time
+    sorted_releases = sorted(
+        with_release_time, key=lambda x: x[1].effective_release_time
+    )
+
+    by_date = collections.defaultdict(lambda: [])
+    for time in sorted_releases:
+        date = time[1].effective_release_time.date()
+        by_date[date].append(time)
+
+    first_date = datetime.date.today()
+    last_date = sorted_releases[-1][1].effective_release_time.date()
+
+    date_cursor = first_date
+    while date_cursor <= last_date:
+        releases = by_date[date_cursor]
+
+        if date_cursor.weekday() == 0 and not args.skip_empty_days:
+            print()
+            print(9 * " ", _body("----------"))
+            print()
+
+        if date_cursor == datetime.date.today():
+            header = "today"
+        else:
+            header = ""
+
+        if releases or not args.skip_empty_days:
+            print(_header(_lpad(header, 9)), end=" ")
+            print(date_cursor.strftime("%a %b %d").lower())
+
+        if date_cursor not in by_date:
+            date_cursor += datetime.timedelta(days=1)
+            continue
+
+        for loc, (ert, ready) in by_date[date_cursor]:
+
+            if not ready:
+                color = _error
+            elif ert > datetime.datetime.now():
                 color = _warning
             else:
                 color = _success
 
-            print(color(str(time)), end="")
-            print(
-                "\t",
-                loc.collection_key,
-                "/",
-                loc.publication_key,
-                "/",
-                loc.artifact_key,
-            )
+            if ert.date() == date_cursor:
+                print(21 * " ", end="")
+
+                print(
+                    str(ert.time()),
+                    _body("::"),
+                    color(loc.collection_key),
+                    _body("/"),
+                    color(loc.publication_key),
+                    _body("/"),
+                    color(loc.artifact_key),
+                    end="",
+                )
+
+                if not ready:
+                    print(" (not ready)")
+                else:
+                    print()
+
+        date_cursor += datetime.timedelta(days=1)
 
 
-def cli():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
+def _arg_vars_file(s):
+    try:
+        name, path = s.split(":")
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            'Vars file argument must be of form "name:path"'
+        )
+
+    with open(path) as fileobj:
+        values = yaml.load(fileobj, Loader=yaml.Loader)
+
+    return {name: values}
+
+
+def _configure_release_schedule_cli(subparsers):
+    release_parser = subparsers.add_parser("release-schedule")
+
+    release_parser.set_defaults(cmd=release_schedule)
+
+    release_parser.add_argument(
         "path", default=pathlib.Path.cwd(), nargs="?", type=pathlib.Path
     )
-    parser.add_argument(
-        "--start-of-week-one",
-        type=datetime.date.fromisoformat,
-        default=None,
-        help="the start of week one. used for smart dates in publication files.",
-    )
-    parser.add_argument(
+    release_parser.add_argument(
         "--skip-directories",
         type=str,
         nargs="+",
         help="directories that will be ignored during discovery",
     )
-    parser.add_argument(
-        "--show-published", action="store_true", default=False,
+    release_parser.add_argument(
+        "--show-not-ready", action="store_true", default=False,
     )
+    release_parser.add_argument(
+        "--skip-empty-days", action="store_true", default=False,
+    )
+    release_parser.add_argument(
+        "--vars",
+        type=_arg_vars_file,
+        default=None,
+        help="A yaml file whose contents will be available in discovery as template variables.",
+    )
+
+
+def cli():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+
+    _configure_release_schedule_cli(subparsers)
 
     args = parser.parse_args()
 
-    date_context = DateContext(start_of_week_one=args.start_of_week_one)
-    release_calendar(
-        args.path,
-        date_context,
-        skip_directories=args.skip_directories,
-        show_published=args.show_published,
-    )
+    args.cmd(args)
