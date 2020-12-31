@@ -1,6 +1,6 @@
 metadata:
-    name: "{{ vars.name }}"
-    due: 2020-09-10 23:59:00
+    name: "{{ course.name }}"
+    due: {{ course.start_date }}
     released: 2020-09-01
 
 artifacts:

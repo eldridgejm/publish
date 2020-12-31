@@ -169,7 +169,7 @@ def _resolve_smart_dates_in_release_time(release_time, metadata, path, date_cont
     return resolved
 
 
-def read_publication_file(path, schema=None, date_context=None, context=None):
+def read_publication_file(path, schema=None, date_context=None, template_vars=None):
     """Read a :class:`Publication` from a yaml file.
 
     Parameters
@@ -213,17 +213,17 @@ def read_publication_file(path, schema=None, date_context=None, context=None):
 
     """
     if date_context is None:
-        date_context = DateContext()
+        date_context = DateContext({})
 
-    if context is None:
-        context = DiscoverContext(vars={})
+    if template_vars is None:
+        template_vars = {}
 
     with path.open() as fileobj:
         raw_contents = fileobj.read()
 
-    # do interpolation
+    # interpolation on the publication file using template_vars
     template = jinja2.Template(raw_contents, undefined=jinja2.StrictUndefined)
-    interpolated = template.render(**context._asdict())
+    interpolated = template.render(**template_vars)
 
     contents = yaml.load(interpolated, Loader=yaml.Loader)
 
@@ -340,18 +340,6 @@ class DiscoverCallbacks:
             The path of the directory to be skipped.
 
         """
-
-
-class DiscoverContext(typing.NamedTuple):
-    """A context that is passed into discover, used to fill template fields."""
-
-    # the user defined variables, passed into the 
-    vars: typing.Mapping[str, typing.Any]
-
-    start_of_week_one: typing.Optional[datetime.date] = None
-
-    previous: typing.Optional[typing.Mapping[str, typing.Any]] = None
-
 
 
 def _is_collection(path):
@@ -488,13 +476,19 @@ def _add_previous_keys(date_context, collection):
     known = {} if date_context.known is None else date_context.known.copy()
     for key, value in prev_meta.items():
         if isinstance(value, datetime.date):
-            known[f'previous.metadata.{key}'] = value
+            known[f"previous.metadata.{key}"] = value
 
     return date_context._replace(known=known)
 
 
 def _make_publications(
-    publication_paths, input_directory, collections, *, callbacks, date_context, context
+    publication_paths,
+    input_directory,
+    collections,
+    *,
+    callbacks,
+    date_context,
+    template_vars,
 ):
     """Make the Publication objects.
 
@@ -528,7 +522,10 @@ def _make_publications(
 
         file_path = path / constants.PUBLICATION_FILE
         publication = read_publication_file(
-            file_path, schema=collection.schema, date_context=publication_date_context, context=context
+            file_path,
+            schema=collection.schema,
+            date_context=publication_date_context,
+            template_vars=template_vars,
         )
 
         collection.publications[publication_key] = publication
@@ -543,7 +540,13 @@ def _sort_dictionary(dct):
     return result
 
 
-def discover(input_directory, skip_directories=None, callbacks=None, date_context=None, context=None):
+def discover(
+    input_directory,
+    skip_directories=None,
+    callbacks=None,
+    date_context=None,
+    template_vars=None,
+):
     """Discover the collections and publications in the filesystem.
 
     Parameters
@@ -573,9 +576,6 @@ def discover(input_directory, skip_directories=None, callbacks=None, date_contex
     if date_context is None:
         date_context = DateContext()
 
-    if context is None:
-        context = DiscoverContext(vars={})
-
     collection_paths, publication_paths = _search_for_collections_and_publications(
         input_directory, skip_directories=skip_directories, callbacks=callbacks
     )
@@ -589,7 +589,7 @@ def discover(input_directory, skip_directories=None, callbacks=None, date_contex
         collections,
         date_context=date_context,
         callbacks=callbacks,
-        context=context
+        template_vars=template_vars,
     )
 
     return Universe(collections)

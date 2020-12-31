@@ -2,6 +2,8 @@ import argparse
 import datetime
 import pathlib
 
+import yaml
+
 
 from ._discover import DiscoverCallbacks, discover
 from ._build import BuildCallbacks, build
@@ -30,6 +32,14 @@ def _arg_output_directory(s):
         return path
 
     return _arg_directory(path)
+
+
+def _arg_vars_file(s):
+    try:
+        name, path = s.split(':')
+    except ValueError:
+        raise argparse.ArgumentTypeError('Vars file argument must be of form "name:path"')
+    return name, path
 
 
 def cli(argv=None):
@@ -75,11 +85,13 @@ def cli(argv=None):
         "--start-of-week-one",
         type=datetime.date.fromisoformat,
         default=None,
-        help="the start of week one. used for smart dates in publication files."
+        help="the start of week one. used for smart dates in publication files.",
     )
-    parser.add_argument("--now",
-            default=None,
-            help="run as if this is the current time"
+    parser.add_argument(
+        "--now", default=None, help="run as if this is the current time"
+    )
+    parser.add_argument(
+            "--vars", type=_arg_vars_file, default=None, help="A yaml file whose contents will be available in discovery as template variables."
             )
 
     args = parser.parse_args(argv)
@@ -99,6 +111,14 @@ def cli(argv=None):
     date_context = DateContext()
     if args.start_of_week_one is not None:
         date_context = date_context._replace(start_of_week_one=args.start_of_week_one)
+
+    if args.vars is None:
+        template_vars = None
+    else:
+        name, path = args.vars
+        with open(path) as fileobj:
+            values = yaml.load(fileobj, Loader=yaml.Loader)
+        template_vars = {name: values}
 
     # construct callbacks for printing information to the screen. start with
     # helper functions for formatting terminal output
@@ -198,6 +218,7 @@ def cli(argv=None):
         args.input_directory,
         skip_directories=args.skip_directories,
         date_context=date_context,
+        template_vars=template_vars,
         callbacks=CLIDiscoverCallbacks(),
     )
 

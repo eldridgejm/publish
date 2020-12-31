@@ -35,6 +35,7 @@ EXAMPLE_8_DIRECTORY = pathlib.Path(__file__).parent / "example_8"
 # good: collection with context variables
 EXAMPLE_9_DIRECTORY = pathlib.Path(__file__).parent / "example_9"
 
+
 def test_discover_finds_collections():
     # when
     universe = publish.discover(EXAMPLE_1_DIRECTORY)
@@ -1125,22 +1126,44 @@ def test_discover_with_dates_relating_to_previous():
     # then
     publications = universe.collections["lectures"].publications
 
-    assert publications["01-intro"].metadata['date'] == datetime.datetime(2021, 1, 5, 23, 0)
-    assert publications["02-foo"].metadata['date'] == datetime.datetime(2021, 1, 7, 23, 0)
-    assert publications["03-bar"].metadata['date'] == datetime.datetime(2021, 1, 12, 23, 0)
+    assert publications["01-intro"].metadata["date"] == datetime.datetime(
+        2021, 1, 5, 23, 0
+    )
+    assert publications["02-foo"].metadata["date"] == datetime.datetime(
+        2021, 1, 7, 23, 0
+    )
+    assert publications["03-bar"].metadata["date"] == datetime.datetime(
+        2021, 1, 12, 23, 0
+    )
     # suppose lecture 4 had to be moved; it is manually set in the file
-    assert publications["04-baz"].metadata['date'] == datetime.datetime(2021, 1, 19, 23, 0)
-    assert publications["05-conclusion"].metadata['date'] == datetime.datetime(2021, 1, 21, 23, 0)
+    assert publications["04-baz"].metadata["date"] == datetime.datetime(
+        2021, 1, 19, 23, 0
+    )
+    assert publications["05-conclusion"].metadata["date"] == datetime.datetime(
+        2021, 1, 21, 23, 0
+    )
 
 
 # interpolation
 
-def test_discover_with_context():
+
+def test_discover_with_template_vars():
     # given
-    context = publish.DiscoverContext(vars={"name": "my favorite homework"})
+    template_vars = {
+        "course": {
+            "name": "my favorite homework",
+            "start_date": datetime.date(2020, 1, 1),
+        }
+    }
 
     # when
-    universe = publish.discover(EXAMPLE_9_DIRECTORY, context=context)
+    universe = publish.discover(EXAMPLE_9_DIRECTORY, template_vars=template_vars)
 
     # then
-    assert universe.collections['homeworks'].publications['01-intro'].metadata['name'] == 'my favorite homework'
+    assert (
+        universe.collections["homeworks"].publications["01-intro"].metadata["name"]
+        == "my favorite homework"
+    )
+    assert universe.collections["homeworks"].publications["01-intro"].metadata[
+        "due"
+    ] == datetime.date(2020, 1, 1)

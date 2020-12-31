@@ -52,6 +52,7 @@ def test_serialize_deserialize_built_publication_roundtrip():
 # misc.
 # --------------------------------------------------------------------------------------
 
+
 def test_collection_as_dict():
     # given
     collection = publish.Collection(
