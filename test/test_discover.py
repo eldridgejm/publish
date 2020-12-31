@@ -32,6 +32,8 @@ EXAMPLE_7_DIRECTORY = pathlib.Path(__file__).parent / "example_7"
 # good: ordered collection with dates relating to previous
 EXAMPLE_8_DIRECTORY = pathlib.Path(__file__).parent / "example_8"
 
+# good: collection with context variables
+EXAMPLE_9_DIRECTORY = pathlib.Path(__file__).parent / "example_9"
 
 def test_discover_finds_collections():
     # when
@@ -1130,3 +1132,15 @@ def test_discover_with_dates_relating_to_previous():
     assert publications["04-baz"].metadata['date'] == datetime.datetime(2021, 1, 19, 23, 0)
     assert publications["05-conclusion"].metadata['date'] == datetime.datetime(2021, 1, 21, 23, 0)
 
+
+# interpolation
+
+def test_discover_with_context():
+    # given
+    context = publish.DiscoverContext(vars={"name": "my favorite homework"})
+
+    # when
+    universe = publish.discover(EXAMPLE_9_DIRECTORY, context=context)
+
+    # then
+    assert universe.collections['homeworks'].publications['01-intro'].metadata['name'] == 'my favorite homework'

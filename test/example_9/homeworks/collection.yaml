@@ -1,0 +1,17 @@
+schema:
+    required_artifacts:
+        - homework.pdf
+        - solution.pdf
+
+    optional_artifacts:
+        - template.zip
+
+    metadata_schema:
+        name:
+            type: string
+        due:
+            type: date
+        released: 
+            type: date
+
+    is_ordered: true
