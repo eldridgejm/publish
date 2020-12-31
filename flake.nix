@@ -15,7 +15,7 @@
             python3Packages.buildPythonPackage {
               name = "publish";
               src = ./.;
-              propagatedBuildInputs = with python3Packages; [ pyyaml cerberus ];
+              propagatedBuildInputs = with python3Packages; [ pyyaml cerberus jinja2 ];
               nativeBuildInputs = with python3Packages; [ pytest black ipython sphinx sphinx_rtd_theme ];
             }
 
