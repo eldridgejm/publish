@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
     name="publish",
     version="0.1.5",
-    packages=find_packages("publish"),
+    packages=find_packages(),
     install_requires=["pyyaml", "cerberus"],
     tests_require=["pytest"],
     entry_points={
