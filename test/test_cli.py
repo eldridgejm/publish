@@ -63,11 +63,13 @@ def test_publish_cli_with_example_using_template_vars(
     # given
     input_directory = make_input_directory("example_9")
 
-    contents = dedent("""
+    contents = dedent(
+        """
         name: this is a test
         start_date: 2020-01-01
-    """)
-    with (input_directory / 'myvars.yaml').open('w') as fileobj:
+    """
+    )
+    with (input_directory / "myvars.yaml").open("w") as fileobj:
         fileobj.write(contents)
 
     # when
@@ -78,7 +80,8 @@ def test_publish_cli_with_example_using_template_vars(
             "--start-of-week-one",
             "2020-01-04",
             "--ignore-release-time",
-            "--vars", f"course:{input_directory}/myvars.yaml"
+            "--vars",
+            f"course:{input_directory}/myvars.yaml",
         ]
     )
 

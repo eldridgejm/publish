@@ -36,9 +36,11 @@ def _arg_output_directory(s):
 
 def _arg_vars_file(s):
     try:
-        name, path = s.split(':')
+        name, path = s.split(":")
     except ValueError:
-        raise argparse.ArgumentTypeError('Vars file argument must be of form "name:path"')
+        raise argparse.ArgumentTypeError(
+            'Vars file argument must be of form "name:path"'
+        )
     return name, path
 
 
@@ -91,8 +93,11 @@ def cli(argv=None):
         "--now", default=None, help="run as if this is the current time"
     )
     parser.add_argument(
-            "--vars", type=_arg_vars_file, default=None, help="A yaml file whose contents will be available in discovery as template variables."
-            )
+        "--vars",
+        type=_arg_vars_file,
+        default=None,
+        help="A yaml file whose contents will be available in discovery as template variables.",
+    )
 
     args = parser.parse_args(argv)
 
