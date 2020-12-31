@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import pathlib
+import textwrap
 
 import yaml
 
@@ -164,19 +165,24 @@ def cli(argv=None):
                     args.input_directory.absolute()
                 )
                 path = relative_workdir / key
-                print(_normal(str(path)), end="")
+                msg = _normal(str(path))
+                print(msg, end="")
 
         def on_too_soon(self, node):
-            if isinstance(node, UnbuiltArtifact):
-                tabs = "    "
-            else:
-                tabs = ""
-
             msg = (
-                f"{tabs}Release time {node.release_time} has not yet been reached. "
+                f"   Release time {node.release_time} has not yet been reached. "
                 "Skipping."
             )
-            print(_warning(msg))
+            if isinstance(node, UnbuiltArtifact):
+                print(_warning(msg))
+
+            else:
+                for key, artifact in node.artifacts.items():
+                    relative_workdir = artifact.workdir.relative_to(
+                        args.input_directory.absolute()
+                    )
+                    path = relative_workdir / key
+                    print(str(path) + " " + _warning(msg))
 
         def on_missing(self, node):
             print(_warning(" file missing, but missing_ok=True"))
@@ -196,7 +202,7 @@ def cli(argv=None):
                     print(str(path) + " " + _warning(msg))
 
         def on_success(self, output):
-            print(_success(" build was successful ✓"))
+            print(_success("   build was successful ✓"))
 
     class CLIFilterCallbacks(FilterCallbacks):
         def on_miss(self, x):
