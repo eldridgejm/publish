@@ -226,4 +226,4 @@ from ._serialize import *
 from ._cli import cli
 from ._smartdates import resolve_smart_dates
 
-__version__ = (0, 1, 5)
+__version__ = (0, 1, 6)
