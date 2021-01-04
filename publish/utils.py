@@ -96,6 +96,10 @@ def _error(message):
     return "\u001b[31m" + message + "\u001b[0m"
 
 
+def _purple(message):
+    return "\u001b[35m" + message + "\u001b[0m"
+
+
 def cli(argv=None):
     pass
 
@@ -165,12 +169,21 @@ def release_schedule(args):
 
         for loc, (ert, ready) in by_date[date_cursor]:
 
+            suffix = ''
+            missing = not (loc.artifact.workdir / loc.artifact.file).exists()
+
             if not ready:
                 color = _error
+                suffix = '(not ready)'
+            elif missing:
+                suffix = '(missing)'
+                color = _purple
             elif ert > datetime.datetime.now():
                 color = _warning
+                suffix = '(waiting)'
             else:
                 color = _success
+                suffix = '(released)'
 
             if ert.date() == date_cursor:
                 print(21 * " ", end="")
@@ -186,10 +199,7 @@ def release_schedule(args):
                     end="",
                 )
 
-                if not ready:
-                    print(" (not ready)")
-                else:
-                    print()
+                print(f" {suffix}")
 
         date_cursor += datetime.timedelta(days=1)
 
